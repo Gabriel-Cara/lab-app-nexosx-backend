@@ -5,3 +5,11 @@ export const packageCreateSchema = z.object({
   description: z.string().min(3),
   carrier: z.string(),
 });
+
+export const packageParamsSchema = z.object({
+  id: z.uuid(),
+})
+
+export const packageRetrieveSchema = z.object({
+  code: z.string(),
+})

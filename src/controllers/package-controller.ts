@@ -1,12 +1,15 @@
 import { prisma } from "@/database/prisma";
 import { notifyResident } from "@/services/notification-service";
+import { AppError } from "@/utils/app-error";
 import { generateCode } from "@/utils/generate-code";
-import { packageCreateSchema } from "@/validators/package-schemas";
+import { packageCreateSchema, packageParamsSchema, packageRetrieveSchema } from "@/validators/package-schemas";
 import { Request, Response } from "express";
 
 class PackageController {
   async create(request: Request, response: Response) {
-    const { residentId, description, carrier } = packageCreateSchema.parse(request.body);
+    const { residentId, description, carrier } = packageCreateSchema.parse(
+      request.body
+    );
 
     const code = generateCode();
 
@@ -16,34 +19,78 @@ class PackageController {
         residentId,
         description,
         carrier: carrier ?? null,
-        createdById: request.user!.id
+        createdById: request.user!.id,
       },
       include: {
         resident: {
           select: {
             name: true,
-            phone: true
-          }
-        }
-      }
+            phone: true,
+          },
+        },
+      },
     });
 
-    if(pkg.resident.phone) {
+    if (pkg.resident.phone) {
       await notifyResident({
         phone: pkg.resident.phone,
-        message: `Olá ${pkg.resident.name}, sua encomenda chegou! Código: ${code}`
+        message: `Olá ${pkg.resident.name}, sua encomenda chegou! Código: ${code}`,
       });
     }
 
     return response.status(201).json(pkg);
   }
 
-  async list() {
-    
+  async list(request: Request, response: Response) {
+    const { role, id } = request.user!;
+
+    const where = role === "resident" ? { residentId: id } : undefined;
+
+    const packages = await prisma.package.findMany({
+      ...(where ? { where } : {}),
+      include: {
+        resident: { select: { name: true, apartment: true, phone: true } },
+        createdBy: { select: { name: true } },
+      },
+      orderBy: { receivedAt: "desc" },
+    });
+
+    return response.json(packages);
   }
 
-  retrieve() {
+  async retrieve(request: Request, response: Response) {
+    const { id } = packageParamsSchema.parse(request.params);
 
+    if(!id) {
+      throw new AppError("Must provide id", 400);
+    }
+
+    const parsed = packageRetrieveSchema.parse(request.body);
+
+    const pkg = await prisma.package.findUnique({ where: { id } });
+
+    if(!pkg) {
+      throw new AppError("Package not found", 404);
+    }
+
+    if(parsed.code !== pkg.code) {
+      throw new AppError("Invalid code", 400);
+    }
+
+    const updated = await prisma.package.update({
+      where: { id },
+      data: {
+        retrievedAt: new Date(),
+        retrievalLogs: {
+          create: {
+            verifiedById: request.user!.id,
+            method: "codigo",
+          }
+        }
+      }
+    });
+
+    return response.json(updated);
   }
 }
 

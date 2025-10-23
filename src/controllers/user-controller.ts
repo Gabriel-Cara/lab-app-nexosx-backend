@@ -26,7 +26,7 @@ class UserController {
       throw new AppError("User already exists", 400);
     }
 
-    const hashedPassword = await hash(password, 10);
+    const hashedPassword = await hash(password, 8);
 
     const created = await prisma.user.create({
       data: {
