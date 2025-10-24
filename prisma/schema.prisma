@@ -14,10 +14,10 @@ enum Role {
 }
 
 enum ReservationStatus {
-  PENDING
-  APPROVED
-  REJECTED
-  CANCELLED
+  pending
+  approved
+  rejected
+  cancelled
 }
 
 model User {
@@ -161,7 +161,7 @@ model AreaReservation {
   startTime DateTime
   endTime   DateTime
   purpose   String?
-  status    ReservationStatus @default(PENDING)
+  status    ReservationStatus @default(pending)
   createdAt DateTime          @default(now())
 
   areaId String

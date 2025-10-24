@@ -23,7 +23,7 @@ class ReservationsController {
             endTime: { gt: new Date(startTime) },
           },
         ],
-        status: { in: ["PENDING", "APPROVED"] },
+        status: { in: ["pending", "approved"] },
       },
     });
 
@@ -88,7 +88,7 @@ class ReservationsController {
     const updated = await prisma.areaReservation.update({
       where: { id },
       data: {
-        status: "APPROVED"
+        status: "approved"
       }
     });
 
@@ -109,7 +109,7 @@ class ReservationsController {
     const updated = await prisma.areaReservation.update({
       where: { id },
       data: {
-        status: "REJECTED"
+        status: "rejected"
       }
     });
 
@@ -130,7 +130,7 @@ class ReservationsController {
     const updated = await prisma.areaReservation.update({
       where: { id },
       data: {
-        status: "CANCELLED"
+        status: "cancelled"
       }
     });
 

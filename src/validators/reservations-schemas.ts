@@ -14,5 +14,5 @@ export const actionSchema = z.object({
 
 export const reservationQuerySchema = z.object({
   areaId: z.uuid().optional(),
-  status: z.enum(["PENDING", "APPROVED", "REJECTED", "CANCELLED"]).optional(),
+  status: z.enum(["pending", "approved", "rejected", "cancelled"]).optional(),
 })
