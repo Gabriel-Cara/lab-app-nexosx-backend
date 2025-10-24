@@ -3,7 +3,7 @@ import { z } from "zod";
 export const eventCreateSchema = z.object({
   title: z.string().min(3),
   description: z.string().optional(),
-  location: z.string().min(2),
+  commonAreaId: z.uuid(),
   capacity: z.number().int().positive(),
   startDate: z.coerce.date(),
   endDate: z.coerce.date(),

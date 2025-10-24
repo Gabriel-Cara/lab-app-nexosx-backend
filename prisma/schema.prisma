@@ -111,10 +111,13 @@ model RetrievalLog {
 }
 
 model Event {
-  id          String         @id @default(uuid())
+  id          String  @id @default(uuid())
   title       String
   description String?
-  location    String
+
+  commonAreaId String
+  location     CommonArea @relation(fields: [commonAreaId], references: [id])
+
   capacity    Int
   startDate   DateTime       @map("start-date")
   endDate     DateTime       @map("end-date")
@@ -138,7 +141,7 @@ model EventBooking {
 }
 
 model CommonArea {
-  id          String   @id @default(cuid())
+  id          String   @id @default(uuid())
   name        String
   description String?
   capacity    Int?
@@ -147,10 +150,13 @@ model CommonArea {
   updatedAt   DateTime @updatedAt
 
   reservations AreaReservation[]
+  Event        Event[]
+
+  @@map("areas")
 }
 
 model AreaReservation {
-  id        String            @id @default(cuid())
+  id        String            @id @default(uuid())
   date      DateTime
   startTime DateTime
   endTime   DateTime
@@ -165,4 +171,5 @@ model AreaReservation {
   resident   User   @relation(fields: [residentId], references: [id], onDelete: Cascade)
 
   @@index([areaId, date, startTime, endTime])
+  @@map("reservations")
 }

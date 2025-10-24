@@ -16,6 +16,13 @@ class EventsController {
         description: description ?? null,
         createdById: request.user!.id,
       },
+      include: {
+        location: {
+          select: {
+            name: true,
+          }
+        }
+      }
     });
 
     return response.status(201).json(event);
@@ -24,6 +31,7 @@ class EventsController {
   async list(_: Request, response: Response) {
     const events = await prisma.event.findMany({
       include: {
+        location: { select: { name: true } },
         bookings: {
           include: {
             resident: { select: { id: true, name: true, apartment: true } },
