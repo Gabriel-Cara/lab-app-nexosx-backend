@@ -5,7 +5,7 @@ export const visitorRegisterSchema = z.object({
   document: z.string().min(4),
   phone: z.string().optional(),
   visitReason: z.string().optional(),
-  hostId: z.string(),
+  hostId: z.uuid(),
 });
 
 export const visitorExitSchema = z.object({
