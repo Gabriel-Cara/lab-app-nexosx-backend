@@ -13,24 +13,32 @@ enum Role {
   resident
 }
 
+enum ReservationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
 model User {
-  id                 String         @id @default(uuid())
+  id                 String            @id @default(uuid())
   name               String
-  email              String         @unique
+  email              String            @unique
   phone              String?
   password           String
-  role               Role           @default(resident)
+  role               Role              @default(resident)
   apartment          String?
-  createdAt          DateTime       @default(now()) @map("created-at")
-  updatedAt          DateTime       @updatedAt @map("updated-at")
+  createdAt          DateTime          @default(now()) @map("created-at")
+  updatedAt          DateTime          @updatedAt @map("updated-at")
   residents          ResidentInfo?
   packages           Package[]
-  hostedVisits       VisitLog[]     @relation("visit-host")
-  handledVisits      VisitLog[]     @relation("handled-by")
-  createdPackages    Package[]      @relation("package-created-by")
-  verifiedRetrievals RetrievalLog[] @relation("verified-by")
-  createdEvents      Event[]        @relation("event-created-by")
+  hostedVisits       VisitLog[]        @relation("visit-host")
+  handledVisits      VisitLog[]        @relation("handled-by")
+  createdPackages    Package[]         @relation("package-created-by")
+  verifiedRetrievals RetrievalLog[]    @relation("verified-by")
+  createdEvents      Event[]           @relation("event-created-by")
   eventBookings      EventBooking[]
+  AreaReservation    AreaReservation[]
 
   @@map("users")
 }
@@ -127,4 +135,34 @@ model EventBooking {
   createdAt  DateTime @default(now()) @map("created-at")
 
   @@map("events-booking")
+}
+
+model CommonArea {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  capacity    Int?
+  available   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  reservations AreaReservation[]
+}
+
+model AreaReservation {
+  id        String            @id @default(cuid())
+  date      DateTime
+  startTime DateTime
+  endTime   DateTime
+  purpose   String?
+  status    ReservationStatus @default(PENDING)
+  createdAt DateTime          @default(now())
+
+  areaId String
+  area   CommonArea @relation(fields: [areaId], references: [id], onDelete: Cascade)
+
+  residentId String
+  resident   User   @relation(fields: [residentId], references: [id], onDelete: Cascade)
+
+  @@index([areaId, date, startTime, endTime])
 }
