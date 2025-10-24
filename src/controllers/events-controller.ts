@@ -6,7 +6,7 @@ import {
 } from "@/validators/event-schemas";
 import { Request, Response } from "express";
 
-class EventController {
+class EventsController {
   async create(request: Request, response: Response) {
     const { description, ...eventData } = eventCreateSchema.parse(request.body);
 
@@ -65,4 +65,4 @@ class EventController {
   }
 }
 
-export { EventController };
+export { EventsController };

@@ -5,7 +5,7 @@ import { generateCode } from "@/utils/generate-code";
 import { packageCreateSchema, packageParamsSchema, packageRetrieveSchema } from "@/validators/package-schemas";
 import { Request, Response } from "express";
 
-class PackageController {
+class PackagesController {
   async create(request: Request, response: Response) {
     const { residentId, description, carrier } = packageCreateSchema.parse(
       request.body
@@ -94,4 +94,4 @@ class PackageController {
   }
 }
 
-export { PackageController };
+export { PackagesController };

@@ -3,7 +3,7 @@ import { AppError } from "@/utils/app-error";
 import { visitorExitSchema, visitorParamsSchema, visitorRegisterSchema } from "@/validators/visitor-schemas";
 import { Request, Response } from "express";
 
-class VisitorController {
+class VisitorsController {
   async register(request: Request, response: Response) {
     const { name, document, phone, visitReason, hostId } = visitorRegisterSchema.parse(request.body);
 
@@ -70,4 +70,4 @@ class VisitorController {
   }
 }
 
-export { VisitorController };
+export { VisitorsController };

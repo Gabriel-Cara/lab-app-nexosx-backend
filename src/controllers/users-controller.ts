@@ -6,7 +6,7 @@ import { AppError } from "@/utils/app-error";
 
 import { userCreateSchema } from "@/validators/auth-schemas";
 
-class UserController {
+class UsersController {
   async create(request: Request, response: Response) {
     const {
       name,
@@ -62,4 +62,4 @@ class UserController {
   }
 }
 
-export { UserController };
+export { UsersController };
