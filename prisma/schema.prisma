@@ -20,6 +20,14 @@ enum ReservationStatus {
   cancelled
 }
 
+enum VisitorStatus {
+  pending
+  authorized
+  denied
+  entry
+  left
+}
+
 model User {
   id                 String            @id @default(uuid())
   name               String
@@ -55,13 +63,14 @@ model ResidentInfo {
 }
 
 model Visitor {
-  id          String     @id @default(uuid())
+  id          String        @id @default(uuid())
   name        String
-  document    String     @unique
+  document    String        @unique
   phone       String?
-  visitReason String?    @map("visit-reason")
-  createdAt   DateTime   @default(now()) @map("created-at")
-  updatedAt   DateTime   @updatedAt @map("updated-at")
+  visitReason String?       @map("visit-reason")
+  status      VisitorStatus @default(pending)
+  createdAt   DateTime      @default(now()) @map("created-at")
+  updatedAt   DateTime      @updatedAt @map("updated-at")
   logs        VisitLog[]
 
   @@map("visitors")
@@ -73,7 +82,7 @@ model VisitLog {
   visitorId   String    @map("visitor-id")
   host        User      @relation("visit-host", fields: [hostId], references: [id])
   hostId      String    @map("host-id")
-  entryTime   DateTime  @default(now()) @map("entry-time")
+  entryTime   DateTime? @map("entry-time")
   exitTime    DateTime? @map("exit-time")
   notes       String?
   handledBy   User?     @relation("handled-by", fields: [handledById], references: [id])

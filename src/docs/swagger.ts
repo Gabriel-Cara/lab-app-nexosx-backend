@@ -53,7 +53,6 @@ const swaggerDocument = {
           name: { type: "string" },
           email: { type: "string", format: "email" },
           role: { type: "string", enum: ["admin", "staff", "resident"] },
-          apartment: { type: "string", nullable: true },
         },
       },
       AuthResponse: {
@@ -304,6 +303,36 @@ const swaggerDocument = {
       get: {
         tags: ["Auth"],
         summary: "Lista usuários cadastrados",
+        parameters: [
+          {
+            in: "query",
+            name: "page",
+            schema: { type: "integer", minimum: 1, default: 1 },
+            description: "Página atual da paginação",
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: { type: "integer", minimum: 1, maximum: 100, default: 10 },
+            description: "Quantidade de registros por página",
+          },
+          {
+            in: "query",
+            name: "search",
+            schema: { type: "string" },
+            description:
+              "Texto livre para buscar por nome, email, telefone ou apartamento",
+          },
+          {
+            in: "query",
+            name: "role",
+            schema: {
+              type: "string",
+              enum: ["admin", "resident", "staff"],
+            },
+            description: "Filtra por perfil de usuário",
+          },
+        ],
         responses: {
           "200": {
             description: "Lista de usuários",
@@ -313,6 +342,24 @@ const swaggerDocument = {
                   type: "array",
                   items: { $ref: "#/components/schemas/AuthenticatedUser" },
                 },
+              },
+            },
+            headers: {
+              "x-total-count": {
+                description: "Total de registros encontrados para os filtros",
+                schema: { type: "integer" },
+              },
+              "x-total-pages": {
+                description: "Total de páginas disponíveis",
+                schema: { type: "integer" },
+              },
+              "x-page": {
+                description: "Página retornada",
+                schema: { type: "integer" },
+              },
+              "x-limit": {
+                description: "Limite utilizado na consulta",
+                schema: { type: "integer" },
               },
             },
           },

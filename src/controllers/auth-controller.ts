@@ -31,21 +31,20 @@ class AuthController {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role,
-        apartment: user.apartment,
+        role: user.role
       },
     });
   }
 
   async me(request: Request, response: Response) {
     const userId = request.user?.id;
+
     if (!userId) {
       throw new AppError("Invalid JWT token", 401);
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { residents: true },
+      where: { id: userId }
     });
 
     if (!user) {

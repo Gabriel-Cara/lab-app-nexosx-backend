@@ -7,10 +7,13 @@ const visitorsRoutes = Router();
 
 const visitorsController = new VisitorsController();
 
-visitorsRoutes.use(authenticate, authorize(["admin", "staff"]));
+visitorsRoutes.use(authenticate);
 
-visitorsRoutes.post("/", visitorsController.register);
-visitorsRoutes.get("/", visitorsController.list);
-visitorsRoutes.post("/:id/exit", visitorsController.exit);
+visitorsRoutes.post("/", authorize(["admin", "staff"]), visitorsController.register);
+visitorsRoutes.get("/", authorize(["admin", "staff"]), visitorsController.list);
+visitorsRoutes.patch("/:id/entry", authorize(["admin", "staff"]), visitorsController.entry);
+visitorsRoutes.patch("/:id/exit", authorize(["admin", "staff"]), visitorsController.exit);
+visitorsRoutes.patch("/:id/approve", authorize(["admin", "staff", "resident"]), visitorsController.approve);
+visitorsRoutes.patch("/:id/reject", authorize(["admin", "staff", "resident"]), visitorsController.reject);
 
 export { visitorsRoutes };

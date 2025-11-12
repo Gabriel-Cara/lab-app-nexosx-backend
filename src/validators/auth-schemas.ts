@@ -22,3 +22,13 @@ export const updateProfileSchema = z.object({
   vehicle: z.string().optional(),
   emergencyContact: z.string().optional(),
 });
+
+export const paramsSchema = z.object({
+  name: z.string().optional(),
+  apartment: z.string().optional(),
+  phone: z.string().optional(),
+  role: z.enum(["admin", "resident", "staff"]).optional(),
+  search: z.string().optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(10),
+});

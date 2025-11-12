@@ -4,7 +4,9 @@ import { hash } from "bcrypt";
 import { prisma } from "@/database/prisma";
 import { AppError } from "@/utils/app-error";
 
-import { userCreateSchema } from "@/validators/auth-schemas";
+import { paramsSchema, userCreateSchema } from "@/validators/auth-schemas";
+
+import type { Prisma } from "@prisma/client";
 
 class UsersController {
   async create(request: Request, response: Response) {
@@ -53,11 +55,56 @@ class UsersController {
     return response.status(201).json(created);
   }
 
-  async list(_: Request, response: Response) {
-    const users = await prisma.user.findMany({
-      include: { residents: true },
-      orderBy: { createdAt: "desc" },
-    });
+  async list(request: Request, response: Response) {
+    const {
+      name,
+      apartment,
+      phone,
+      role,
+      search,
+      page,
+      limit,
+    } = paramsSchema.parse(request.query);
+
+    const where: Prisma.UserWhereInput = {
+      name: name ? { contains: name, mode: "insensitive" } : undefined,
+      apartment: apartment
+        ? { contains: apartment, mode: "insensitive" }
+        : undefined,
+      phone: phone ? { contains: phone, mode: "insensitive" } : undefined,
+      role: role ? { equals: role } : undefined,
+      ...(search
+        ? {
+            OR: [
+              { name: { contains: search, mode: "insensitive" } },
+              { email: { contains: search, mode: "insensitive" } },
+              { phone: { contains: search, mode: "insensitive" } },
+              { apartment: { contains: search, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+    };
+
+    const skip = (page - 1) * limit;
+
+    const [users, total] = await prisma.$transaction([
+      prisma.user.findMany({
+        include: { residents: true },
+        orderBy: { createdAt: "desc" },
+        where,
+        take: limit,
+        skip,
+      }),
+      prisma.user.count({ where }),
+    ]);
+
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+
+    response.set("total-count", String(total));
+    response.set("total-pages", String(totalPages));
+    response.set("page", String(page));
+    response.set("limit", String(limit));
+
     return response.json(users);
   }
 }
