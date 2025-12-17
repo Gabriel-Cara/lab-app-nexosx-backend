@@ -22,6 +22,7 @@ enum ReservationStatus {
 
 enum PackageStatus {
   pending
+  delayed
   retrieved
   cancelled
 }

@@ -1,4 +1,5 @@
 import { prisma } from "@/database/prisma";
+import { syncDelayedPackages } from "@/services/package-status-service";
 import { notifyResident } from "@/services/notification-service";
 import { AppError } from "@/utils/app-error";
 import { generateCode } from "@/utils/generate-code";
@@ -50,6 +51,8 @@ class PackagesController {
     const { role, id } = request.user!;
 
     const where = role === "resident" ? { residentId: id } : undefined;
+
+    await syncDelayedPackages();
 
     const packages = await prisma.package.findMany({
       ...(where ? { where } : {}),
