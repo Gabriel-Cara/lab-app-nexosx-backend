@@ -36,7 +36,7 @@ export const updateProfileSchema = z.object({
 });
 
 export const userIdParamsSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
 });
 
 export const paramsSchema = z.object({

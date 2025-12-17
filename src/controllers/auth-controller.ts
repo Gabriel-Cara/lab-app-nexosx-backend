@@ -4,7 +4,7 @@ import { compare } from "bcrypt";
 import { AppError } from "@/utils/app-error";
 import { prisma } from "@/database/prisma";
 
-import { loginSchema } from "@/validators/auth-schemas";
+import { loginSchema, userIdParamsSchema } from "@/validators/auth-schemas";
 import { signToken } from "@/configs/token";
 
 class AuthController {
@@ -37,14 +37,14 @@ class AuthController {
   }
 
   async me(request: Request, response: Response) {
-    const userId = request.user?.id;
+    const { id } = userIdParamsSchema.parse(request.params);
 
-    if (!userId) {
+    if (!id) {
       throw new AppError("Invalid JWT token", 401);
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: userId }
+      where: { id },
     });
 
     if (!user) {

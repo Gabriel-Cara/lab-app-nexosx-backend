@@ -11,7 +11,7 @@ const authController = new AuthController();
 const usersController = new UsersController();
 
 authRoutes.post("/login", authController.login);
-authRoutes.get("/me", authenticate, authController.me);
+authRoutes.get("/me/:id", authenticate, authController.me);
 
 authRoutes.post("/users", usersController.create);
 authRoutes.get("/users", authenticate, authorize(["admin", "staff"]), usersController.list);
