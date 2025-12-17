@@ -9,8 +9,8 @@ const visitorsController = new VisitorsController();
 
 visitorsRoutes.use(authenticate);
 
-visitorsRoutes.post("/", authorize(["admin", "staff"]), visitorsController.register);
-visitorsRoutes.get("/", authorize(["admin", "staff"]), visitorsController.list);
+visitorsRoutes.post("/", authorize(["admin", "staff", "resident"]), visitorsController.register);
+visitorsRoutes.get("/", authorize(["admin", "staff", "resident"]), visitorsController.list);
 visitorsRoutes.patch("/:id/entry", authorize(["admin", "staff"]), visitorsController.entry);
 visitorsRoutes.patch("/:id/exit", authorize(["admin", "staff"]), visitorsController.exit);
 visitorsRoutes.patch("/:id/approve", authorize(["admin", "staff", "resident"]), visitorsController.approve);

@@ -17,10 +17,26 @@ export const userCreateSchema = z.object({
   emergencyContact: z.string().optional(),
 });
 
+export const userUpdateSchema = z.object({
+  name: z.string().min(3).optional(),
+  email: z.string().email().optional(),
+  phone: z.string().min(8).optional(),
+  role: z.enum(["admin", "staff", "resident"]).optional(),
+  apartment: z.string().optional(),
+  password: z.string().min(6).optional(),
+  building: z.string().optional(),
+  vehicle: z.string().optional(),
+  emergencyContact: z.string().optional(),
+});
+
 export const updateProfileSchema = z.object({
   phone: z.string().optional(),
   vehicle: z.string().optional(),
   emergencyContact: z.string().optional(),
+});
+
+export const userIdParamsSchema = z.object({
+  id: z.string().uuid(),
 });
 
 export const paramsSchema = z.object({

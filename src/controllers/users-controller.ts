@@ -4,7 +4,12 @@ import { hash } from "bcrypt";
 import { prisma } from "@/database/prisma";
 import { AppError } from "@/utils/app-error";
 
-import { paramsSchema, userCreateSchema } from "@/validators/auth-schemas";
+import {
+  paramsSchema,
+  userCreateSchema,
+  userIdParamsSchema,
+  userUpdateSchema,
+} from "@/validators/auth-schemas";
 
 import type { Prisma } from "@prisma/client";
 
@@ -106,6 +111,124 @@ class UsersController {
     response.set("limit", String(limit));
 
     return response.json(users);
+  }
+
+  async update(request: Request, response: Response) {
+    const { id } = userIdParamsSchema.parse(request.params);
+
+    const {
+      name,
+      email,
+      phone,
+      role,
+      apartment,
+      password,
+      building,
+      vehicle,
+      emergencyContact,
+    } = userUpdateSchema.parse(request.body);
+
+    const existing = await prisma.user.findUnique({
+      where: { id },
+      include: { residents: true },
+    });
+
+    if (!existing) {
+      throw new AppError("User not found", 404);
+    }
+
+    if (email && email !== existing.email) {
+      const emailInUse = await prisma.user.findUnique({ where: { email } });
+      if (emailInUse) {
+        throw new AppError("Email already in use", 400);
+      }
+    }
+
+    const data: Prisma.UserUpdateInput = {};
+
+    if (name !== undefined) data.name = name;
+    if (email !== undefined) data.email = email;
+    if (phone !== undefined) data.phone = phone;
+    if (role !== undefined) data.role = role;
+    if (apartment !== undefined) data.apartment = apartment ?? null;
+
+    if (password) {
+      data.password = await hash(password, 8);
+    }
+
+    const finalRole = role ?? existing.role;
+
+    const normalizedBuilding =
+      building !== undefined ? building || null : undefined;
+    const normalizedVehicle =
+      vehicle !== undefined ? vehicle || null : undefined;
+    const normalizedEmergencyContact =
+      emergencyContact !== undefined ? emergencyContact || null : undefined;
+
+    if (finalRole === "resident") {
+      if (
+        normalizedBuilding !== undefined ||
+        normalizedVehicle !== undefined ||
+        normalizedEmergencyContact !== undefined ||
+        !existing.residents
+      ) {
+        data.residents = {
+          upsert: {
+            create: {
+              building: normalizedBuilding ?? null,
+              vehicle: normalizedVehicle ?? null,
+              emergencyContact: normalizedEmergencyContact ?? null,
+            },
+            update: {
+              ...(normalizedBuilding !== undefined
+                ? { building: normalizedBuilding }
+                : {}),
+              ...(normalizedVehicle !== undefined
+                ? { vehicle: normalizedVehicle }
+                : {}),
+              ...(normalizedEmergencyContact !== undefined
+                ? { emergencyContact: normalizedEmergencyContact }
+                : {}),
+            },
+          },
+        };
+      }
+    } else if (existing.residents) {
+      data.residents = { delete: true };
+    }
+
+    const updated = await prisma.user.update({
+      where: { id },
+      data,
+      include: { residents: true },
+    });
+
+    return response.json(updated);
+  }
+
+  async delete(request: Request, response: Response) {
+    const { id } = userIdParamsSchema.parse(request.params);
+
+    const existing = await prisma.user.findUnique({
+      where: { id },
+      include: { residents: true },
+    });
+
+    if (!existing) {
+      throw new AppError("User not found", 404);
+    }
+
+    if (existing.residents) {
+      await prisma.residentInfo.delete({
+        where: { userId: id },
+      });
+    }
+
+    await prisma.user.delete({
+      where: { id },
+    });
+
+    return response.status(204).send();
   }
 }
 

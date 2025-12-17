@@ -1,6 +1,6 @@
 import { prisma } from "@/database/prisma";
 import { AppError } from "@/utils/app-error";
-import { visitorActionSchema, visitorParamsSchema, visitorRegisterSchema } from "@/validators/visitor-schemas";
+import { visitorParamsSchema, visitorRegisterSchema } from "@/validators/visitor-schemas";
 import { Request, Response } from "express";
 
 class VisitorsController {
@@ -10,7 +10,7 @@ class VisitorsController {
     const visitor = await prisma.visitor.upsert({
       where: { document },
       update: { name, phone: phone ?? null, visitReason: visitReason ?? null, status: "pending" },
-      create: { name, document, phone: phone ?? null, visitReason: visitReason ?? null, status: "pending"  },
+      create: { name, document, phone: phone ?? null, visitReason: visitReason ?? null, status: "pending" },
     });
 
     const log = await prisma.visitLog.create({
@@ -18,7 +18,7 @@ class VisitorsController {
         visitorId: visitor.id,
         hostId,
         handledById: request.user!.id,
-        notes: visitReason ?? null,
+        status: "pending",
       },
       include: {
         visitor: true,
@@ -37,7 +37,7 @@ class VisitorsController {
       host: { select: { name: true, apartment: true } },
       handledBy: { select: { name: true } },
     },
-    orderBy: { entryTime: "desc" },
+    orderBy: { createdAt: "desc" },
     take: 100,
   });
 
@@ -74,11 +74,7 @@ class VisitorsController {
       where: { id: logPendingEntry.id },
       data: {
         entryTime: new Date(),
-        visitor: {
-          update: {
-            status: "entry"
-          }
-        }
+        status: "entry",
       },
       include: {
         visitor: true,
@@ -123,11 +119,7 @@ class VisitorsController {
       where: { id: logPendingExit.id },
       data: {
         exitTime: new Date(),
-        visitor: {
-          update: {
-            status: "left"
-          }
-        }
+        status: "left",
       },
       include: {
         visitor: true,
@@ -146,38 +138,36 @@ class VisitorsController {
       throw new AppError("Must provide id", 400);
     }
 
-    const visitor = await prisma.visitor.findUnique({ where: { id: visitorId } });
-
-    if(!visitor) {
-      throw new AppError("Visitor not found", 404);
-    }
-
-    // Confere se visitante já foi autorizado
-    if(visitor.status === "authorized") {
-      throw new AppError("Visitor is already authorized", 400);
-    } else if (visitor.status === "denied") {
-      throw new AppError("Visitor is already denied", 400);
-    }
-
-    const logId = await prisma.visitLog.findFirst({ where: { visitorId }, select: { id: true } });
-
-    const log = await prisma.visitLog.update({
-      where: { id: logId!.id },
-      data: {
-        visitor: {
-          update: {
-            status: "authorized"
-          }
-        }
-      },
+    const log = await prisma.visitLog.findFirst({
+      where: { visitorId, status: "pending" },
+      orderBy: { createdAt: "desc" },
       include: {
         visitor: true,
         host: true,
         handledBy: true,
-      }
+      },
     });
 
-    return response.json(log);
+    if (!log) {
+      throw new AppError("Visitor does not have a pending visit to approve", 400);
+    }
+
+    const updatedLog = await prisma.visitLog.update({
+      where: { id: log.id },
+      data: { status: "authorized" },
+      include: {
+        visitor: true,
+        host: true,
+        handledBy: true,
+      },
+    });
+
+    await prisma.visitor.update({
+      where: { id: visitorId },
+      data: { status: "authorized" },
+    });
+
+    return response.json(updatedLog);
   }
 
   async reject(request: Request, response: Response) {
@@ -187,38 +177,36 @@ class VisitorsController {
       throw new AppError("Must provide id", 400);
     }
 
-    const visitor = await prisma.visitor.findUnique({ where: { id: visitorId } });
-
-    if(!visitor) {
-      throw new AppError("Visitor not found", 404);
-    }
-
-    // Confere se visitante já foi autorizado
-    if(visitor.status === "authorized") {
-      throw new AppError("Visitor is already authorized", 400);
-    } else if (visitor.status === "denied") {
-      throw new AppError("Visitor is already denied", 400);
-    }
-
-    const logId = await prisma.visitLog.findFirst({ where: { visitorId }, select: { id: true } });
-
-    const log = await prisma.visitLog.update({
-      where: { id: logId!.id },
-      data: {
-        visitor: {
-          update: {
-            status: "denied"
-          }
-        }
-      },
+    const log = await prisma.visitLog.findFirst({
+      where: { visitorId, status: "pending" },
+      orderBy: { createdAt: "desc" },
       include: {
         visitor: true,
         host: true,
         handledBy: true,
-      }
+      },
     });
 
-    return response.json(log);
+    if (!log) {
+      throw new AppError("Visitor does not have a pending visit to reject", 400);
+    }
+
+    const updatedLog = await prisma.visitLog.update({
+      where: { id: log.id },
+      data: { status: "denied" },
+      include: {
+        visitor: true,
+        host: true,
+        handledBy: true,
+      },
+    });
+
+    await prisma.visitor.update({
+      where: { id: visitorId },
+      data: { status: "denied" },
+    });
+
+    return response.json(updatedLog);
   }
 }
 

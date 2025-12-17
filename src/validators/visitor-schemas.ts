@@ -14,10 +14,6 @@ export const visitorRegisterSchema = z.object({
   hostId: z.uuid(),
 });
 
-export const visitorActionSchema = z.object({
-  notes: z.string().optional(),
-});
-
 export const visitorParamsSchema = z.object({
   id: z.uuid(),
 })

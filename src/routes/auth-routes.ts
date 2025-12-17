@@ -15,5 +15,7 @@ authRoutes.get("/me", authenticate, authController.me);
 
 authRoutes.post("/users", authenticate, authorize(["admin", "staff"]), usersController.create);
 authRoutes.get("/users", authenticate, authorize(["admin", "staff"]), usersController.list);
+authRoutes.put("/users/:id", authenticate, authorize(["admin", "staff"]), usersController.update);
+authRoutes.delete("/users/:id", authenticate, authorize(["admin", "staff"]), usersController.delete);
 
 export { authRoutes };

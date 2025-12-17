@@ -3,8 +3,14 @@
   "version": "1.0.0",
   "description": "API for app of management of condominiums",
   "main": "index.js",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
-    "dev": "tsx watch src/server.ts"
+    "dev": "tsx watch src/server.ts",
+    "seed": "prisma db seed",
+    "build": "tsup src --out-dir build",
+    "start": "node build/server.js"
   },
   "author": "Gabriel Cara",
   "license": "ISC",
@@ -25,7 +31,11 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^24.8.1",
     "prisma": "^6.17.1",
+    "tsup": "^8.3.0",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   }
 }

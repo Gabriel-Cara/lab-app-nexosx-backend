@@ -12,3 +12,12 @@ export const updateAreaSchema = createAreaSchema.partial();
 export const areaParamsSchema = z.object({
   id: z.uuid(),
 });
+
+export const areaSlotsQuerySchema = z.object({
+  date: z.string().datetime(),
+});
+
+export const areaSlotsRangeQuerySchema = z.object({
+  start: z.string().datetime(),
+  end: z.string().datetime().optional(),
+});

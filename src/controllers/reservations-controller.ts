@@ -7,16 +7,48 @@ import {
   createReservationSchema,
   reservationQuerySchema,
 } from "@/validators/reservations-schemas";
+import {
+  combineDateWithTime,
+  minutesFromTime,
+  normalizeDate,
+} from "@/utils/datetime";
 
 class ReservationsController {
   async create(request: Request, response: Response) {
-    const { areaId, date, startTime, endTime, purpose } =
+    const { areaId, date, startSlotId, endSlotId, purpose } =
       createReservationSchema.parse(request.body);
+
+    const reservationDate = normalizeDate(date)
+
+    const slots = await prisma.areaTimeSlot.findMany({
+      where: { id: { in: [startSlotId, endSlotId] } },
+    })
+
+    const startSlot = slots.find((slot) => slot.id === startSlotId)
+    const endSlot = slots.find((slot) => slot.id === endSlotId)
+
+    if (!startSlot || startSlot.areaId !== areaId || !startSlot.isActive) {
+      throw new AppError("Invalid start slot for this area", 400)
+    }
+
+    if (!endSlot || endSlot.areaId !== areaId || !endSlot.isActive) {
+      throw new AppError("Invalid end slot for this area", 400)
+    }
+
+    const startMinutes = minutesFromTime(startSlot.startsAt)
+    const endMinutes = minutesFromTime(endSlot.endsAt)
+
+    if (endMinutes <= startMinutes) {
+      throw new AppError("End time must be after start time", 400)
+    }
+
+    const startTime = combineDateWithTime(reservationDate, startSlot.startsAt)
+    const endTime = combineDateWithTime(reservationDate, endSlot.endsAt)
 
     const conflict = await prisma.areaReservation.findFirst({
       where: {
         areaId: areaId,
-        date: new Date(date),
+        date: reservationDate,
         OR: [
           {
             startTime: { lt: new Date(endTime) },
@@ -35,10 +67,12 @@ class ReservationsController {
       data: {
         areaId,
         residentId: request.user!.id,
-        date,
+        date: reservationDate,
         startTime,
         endTime,
-        purpose: purpose ?? null,
+        startSlotId,
+        endSlotId,
+        purpose,
       },
       include: {
         resident: {
@@ -55,11 +89,43 @@ class ReservationsController {
   }
 
   async list(request: Request, response: Response) {
-    const { areaId, status } = reservationQuerySchema.parse(request.query);
+    const { areaId, status, startDate, endDate } =
+      reservationQuerySchema.parse(request.query);
+
+    let start: Date | undefined
+    let end: Date | undefined
+
+    if (startDate) {
+      start = new Date(startDate)
+      if (Number.isNaN(start.getTime())) {
+        throw new AppError("Invalid start date", 400)
+      }
+      start.setHours(0, 0, 0, 0)
+    }
+
+    if (endDate) {
+      end = new Date(endDate)
+      if (Number.isNaN(end.getTime())) {
+        throw new AppError("Invalid end date", 400)
+      }
+      end.setHours(23, 59, 59, 999)
+    }
+
+    if (start && end && end < start) {
+      throw new AppError("End date must be after start date", 400)
+    }
 
     const where = {
       ...(areaId ? { areaId } : {}),
       ...(status ? { status } : {}),
+      ...(start || end
+        ? {
+            date: {
+              ...(start ? { gte: start } : {}),
+              ...(end ? { lte: end } : {}),
+            },
+          }
+        : {}),
     };
 
     const reservations = await prisma.areaReservation.findMany({

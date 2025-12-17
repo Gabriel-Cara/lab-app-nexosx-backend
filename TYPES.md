@@ -179,6 +179,7 @@ handledBy: {
   updatedAt: Date
 } | null
 ```
+
 ### Entry
 Alterna status para **authorized** e marca data de entrada.
 

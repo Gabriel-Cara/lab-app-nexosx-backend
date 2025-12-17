@@ -20,12 +20,25 @@ enum ReservationStatus {
   cancelled
 }
 
+enum PackageStatus {
+  pending
+  retrieved
+  cancelled
+}
+
 enum VisitorStatus {
   pending
   authorized
   denied
   entry
   left
+}
+
+enum PackageType {
+  box
+  envelope
+  food
+  others
 }
 
 model User {
@@ -77,16 +90,18 @@ model Visitor {
 }
 
 model VisitLog {
-  id          String    @id @default(uuid())
-  visitor     Visitor   @relation(fields: [visitorId], references: [id])
-  visitorId   String    @map("visitor-id")
-  host        User      @relation("visit-host", fields: [hostId], references: [id])
-  hostId      String    @map("host-id")
-  entryTime   DateTime? @map("entry-time")
-  exitTime    DateTime? @map("exit-time")
+  id          String        @id @default(uuid())
+  visitor     Visitor       @relation(fields: [visitorId], references: [id])
+  visitorId   String        @map("visitor-id")
+  host        User          @relation("visit-host", fields: [hostId], references: [id])
+  hostId      String        @map("host-id")
+  entryTime   DateTime?     @map("entry-time")
+  exitTime    DateTime?     @map("exit-time")
   notes       String?
-  handledBy   User?     @relation("handled-by", fields: [handledById], references: [id])
+  handledBy   User?         @relation("handled-by", fields: [handledById], references: [id])
   handledById String?
+  status      VisitorStatus @default(pending)
+  createdAt   DateTime      @default(now()) @map("created-at")
 
   @@map("visit-logs")
 }
@@ -96,8 +111,11 @@ model Package {
   code          String         @unique
   description   String
   carrier       String?
+  type          PackageType
+  status        PackageStatus  @default(pending)
   receivedAt    DateTime       @default(now()) @map("received-at")
   retrievedAt   DateTime?      @map("retrieved-at")
+  deliveredAt   DateTime?      @map("delivered-at")
   resident      User           @relation(fields: [residentId], references: [id])
   residentId    String
   createdBy     User           @relation("package-created-by", fields: [createdById], references: [id])
@@ -160,6 +178,7 @@ model CommonArea {
 
   reservations AreaReservation[]
   Event        Event[]
+  timeSlots    AreaTimeSlot[]
 
   @@map("areas")
 }
@@ -176,9 +195,31 @@ model AreaReservation {
   areaId String
   area   CommonArea @relation(fields: [areaId], references: [id], onDelete: Cascade)
 
+  startSlotId String?       @map("start-slot-id")
+  startSlot   AreaTimeSlot? @relation("ReservationStartSlot", fields: [startSlotId], references: [id])
+
+  endSlotId String?       @map("end-slot-id")
+  endSlot   AreaTimeSlot? @relation("ReservationEndSlot", fields: [endSlotId], references: [id])
+
   residentId String
   resident   User   @relation(fields: [residentId], references: [id], onDelete: Cascade)
 
   @@index([areaId, date, startTime, endTime])
   @@map("reservations")
+}
+
+model AreaTimeSlot {
+  id        String        @id @default(uuid())
+  label     String
+  startsAt  String        @map("starts-at")
+  endsAt    String        @map("ends-at")
+  isActive  Boolean       @default(true) @map("is-active")
+  sortOrder Int?          @map("sort-order")
+  areaId    String        @map("area-id")
+  area      CommonArea    @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  startReservations AreaReservation[] @relation("ReservationStartSlot")
+  endReservations   AreaReservation[] @relation("ReservationEndSlot")
+
+  @@unique([areaId, startsAt, endsAt])
+  @@map("area-time-slots")
 }

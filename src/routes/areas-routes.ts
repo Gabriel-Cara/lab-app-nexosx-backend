@@ -10,8 +10,11 @@ const areasController = new AreasController();
 areasRoutes.use(authenticate);
 
 areasRoutes.get("/", areasController.list);
+areasRoutes.get("/:id", areasController.index);
+areasRoutes.get("/:id/slots", areasController.slots);
+areasRoutes.get("/:id/slots-range", areasController.slotsRange);
 areasRoutes.post("/", authorize(["admin", "staff"]), areasController.create);
-areasRoutes.put("/:id", authorize(["admin", "staff"]), areasController.update);
+areasRoutes.patch("/:id", authorize(["admin", "staff"]), areasController.update);
 areasRoutes.delete("/:id", authorize(["admin", "staff"]), areasController.delete);
 
 export { areasRoutes };

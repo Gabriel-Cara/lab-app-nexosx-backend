@@ -2,16 +2,19 @@ import { prisma } from "@/database/prisma";
 import { notifyResident } from "@/services/notification-service";
 import { AppError } from "@/utils/app-error";
 import { generateCode } from "@/utils/generate-code";
-import { packageCreateSchema, packageParamsSchema, packageRetrieveSchema } from "@/validators/package-schemas";
+import {
+  packageCreateSchema,
+  packageParamsSchema,
+  packageRetrieveSchema,
+} from "@/validators/package-schemas";
 import { Request, Response } from "express";
 
 class PackagesController {
   async create(request: Request, response: Response) {
-    const { residentId, description, carrier } = packageCreateSchema.parse(
-      request.body
-    );
+    const { residentId, description, carrier, type } =
+      packageCreateSchema.parse(request.body);
 
-    const code = generateCode();
+    const code = generateCode(6);
 
     const pkg = await prisma.package.create({
       data: {
@@ -19,6 +22,8 @@ class PackagesController {
         residentId,
         description,
         carrier: carrier ?? null,
+        type,
+        status: "pending",
         createdById: request.user!.id,
       },
       include: {
@@ -61,7 +66,7 @@ class PackagesController {
   async retrieve(request: Request, response: Response) {
     const { id } = packageParamsSchema.parse(request.params);
 
-    if(!id) {
+    if (!id) {
       throw new AppError("Must provide id", 400);
     }
 
@@ -69,11 +74,11 @@ class PackagesController {
 
     const pkg = await prisma.package.findUnique({ where: { id } });
 
-    if(!pkg) {
+    if (!pkg) {
       throw new AppError("Package not found", 404);
     }
 
-    if(parsed.code !== pkg.code) {
+    if (parsed.code !== pkg.code) {
       throw new AppError("Invalid code", 400);
     }
 
@@ -81,16 +86,40 @@ class PackagesController {
       where: { id },
       data: {
         retrievedAt: new Date(),
+        status: "retrieved",
         retrievalLogs: {
           create: {
             verifiedById: request.user!.id,
             method: "codigo",
-          }
-        }
-      }
+          },
+        },
+      },
     });
 
     return response.json(updated);
+  }
+
+  async cancel(request: Request, response: Response) {
+    const { id } = packageParamsSchema.parse(request.params);
+
+    if (!id) {
+      throw new AppError("Must provide id", 400);
+    }
+
+    const pkg = await prisma.package.findUnique({ where: { id } });
+
+    if (!pkg) {
+      throw new AppError("Package not found", 404);
+    }
+
+    const updated = await prisma.package.update({
+      where: { id },
+      data: {
+        status: "cancelled",
+      },
+    });
+
+    return response.json({ updated });
   }
 }
 

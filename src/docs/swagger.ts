@@ -170,6 +170,8 @@ const swaggerDocument = {
           startTime: { type: "string", format: "date-time" },
           endTime: { type: "string", format: "date-time" },
           purpose: { type: "string", nullable: true },
+          startSlotId: { type: "string", format: "uuid", nullable: true },
+          endSlotId: { type: "string", format: "uuid", nullable: true },
           status: {
             type: "string",
             enum: ["pending", "approved", "rejected", "cancelled"],
@@ -178,13 +180,61 @@ const swaggerDocument = {
       },
       ReservationInput: {
         type: "object",
-        required: ["areaId", "date", "startTime", "endTime"],
+        required: ["areaId", "date", "startSlotId", "endSlotId"],
         properties: {
           areaId: { type: "string", format: "uuid" },
           date: { type: "string", format: "date-time" },
-          startTime: { type: "string", format: "date-time" },
-          endTime: { type: "string", format: "date-time" },
+          startSlotId: { type: "string", format: "uuid" },
+          endSlotId: { type: "string", format: "uuid" },
           purpose: { type: "string", nullable: true },
+        },
+      },
+      AreaSlot: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          label: { type: "string" },
+          startsAt: { type: "string" },
+          endsAt: { type: "string" },
+          sortOrder: { type: "integer", nullable: true },
+          available: { type: "boolean" },
+        },
+      },
+      AreaSlotDay: {
+        type: "object",
+        properties: {
+          date: { type: "string", format: "date-time" },
+          fullyBooked: { type: "boolean" },
+          slots: {
+            type: "array",
+            items: { $ref: "#/components/schemas/AreaSlot" },
+          },
+        },
+      },
+      AreaSlotsResponse: {
+        type: "object",
+        properties: {
+          date: { type: "string", format: "date-time" },
+          slots: {
+            type: "array",
+            items: { $ref: "#/components/schemas/AreaSlot" },
+          },
+        },
+      },
+      AreaSlotsRangeResponse: {
+        type: "object",
+        properties: {
+          areaId: { type: "string", format: "uuid" },
+          startDate: { type: "string", format: "date-time" },
+          endDate: { type: "string", format: "date-time" },
+          fullyBookedDates: {
+            type: "array",
+            items: { type: "string", format: "date-time" },
+          },
+          days: {
+            type: "array",
+            items: { $ref: "#/components/schemas/AreaSlotDay" },
+          },
         },
       },
       VisitorInput: {
@@ -196,12 +246,6 @@ const swaggerDocument = {
           phone: { type: "string", nullable: true },
           visitReason: { type: "string", nullable: true },
           hostId: { type: "string", format: "uuid" },
-        },
-      },
-      VisitorExitInput: {
-        type: "object",
-        properties: {
-          notes: { type: "string", nullable: true },
         },
       },
     },
@@ -366,6 +410,71 @@ const swaggerDocument = {
         },
       },
     },
+    "/auth/users/{id}": {
+      put: {
+        tags: ["Auth"],
+        summary: "Atualiza um usuário existente",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UserInput" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Usuário atualizado",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/AuthenticatedUser" },
+              },
+            },
+          },
+          "404": {
+            description: "Usuário não encontrado",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+      delete: {
+        tags: ["Auth"],
+        summary: "Remove um usuário existente",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: {
+          "204": {
+            description: "Usuário removido",
+          },
+          "404": {
+            description: "Usuário não encontrado",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
     "/areas": {
       get: {
         tags: ["Áreas"],
@@ -408,9 +517,39 @@ const swaggerDocument = {
       },
     },
     "/areas/{id}": {
-      put: {
+      get: {
         tags: ["Áreas"],
-        summary: "Atualiza uma área comum",
+        summary: "Busca uma área comum pelo ID",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Área localizada",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/Area" },
+              },
+            },
+          },
+          "404": {
+            description: "Área não encontrada",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+      patch: {
+        tags: ["Áreas"],
+        summary: "Atualiza parcialmente uma área comum",
         parameters: [
           {
             name: "id",
@@ -436,6 +575,14 @@ const swaggerDocument = {
               },
             },
           },
+          "404": {
+            description: "Área não encontrada",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
         },
       },
       delete: {
@@ -452,6 +599,123 @@ const swaggerDocument = {
         responses: {
           "204": {
             description: "Área removida",
+          },
+          "404": {
+            description: "Área não encontrada",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/areas/patch-area/{id}": {
+      patch: {
+        tags: ["Áreas"],
+        summary: "Atualiza uma área comum através da rota patch-area",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/AreaInput" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Área atualizada",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/Area" },
+              },
+            },
+          },
+          "404": {
+            description: "Área não encontrada",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/areas/{id}/slots": {
+      get: {
+        tags: ["Áreas"],
+        summary: "Lista os horários disponíveis da área",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+          {
+            name: "date",
+            in: "query",
+            required: true,
+            schema: { type: "string", format: "date-time" },
+            description: "Data base utilizada para listar os horários",
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Horários disponíveis",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/AreaSlotsResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/areas/{id}/slots-range": {
+      get: {
+        tags: ["Áreas"],
+        summary: "Lista os horários disponíveis da área em um intervalo",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+          {
+            name: "start",
+            in: "query",
+            required: true,
+            schema: { type: "string", format: "date-time" },
+            description: "Data inicial do intervalo",
+          },
+          {
+            name: "end",
+            in: "query",
+            required: false,
+            schema: { type: "string", format: "date-time" },
+            description: "Data final (opcional, padrão 6 dias após a inicial)",
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Horários disponíveis por dia",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/AreaSlotsRangeResponse" },
+              },
+            },
           },
         },
       },
@@ -566,7 +830,7 @@ const swaggerDocument = {
       },
     },
     "/packages/{id}/retrieve": {
-      post: {
+      patch: {
         tags: ["Encomendas"],
         summary: "Confirma a retirada de uma encomenda",
         parameters: [
@@ -605,6 +869,38 @@ const swaggerDocument = {
         },
       },
     },
+    "/packages/{id}/cancel": {
+      patch: {
+        tags: ["Encomendas"],
+        summary: "Cancela a retirada de uma encomenda",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Encomenda atualizada",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/Package" },
+              },
+            },
+          },
+          "404": {
+            description: "Encomenda não encontrada",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
     "/reservations": {
       get: {
         tags: ["Reservas"],
@@ -624,6 +920,20 @@ const swaggerDocument = {
               enum: ["pending", "approved", "rejected", "cancelled"],
             },
             required: false,
+          },
+          {
+            name: "startDate",
+            in: "query",
+            required: false,
+            schema: { type: "string", format: "date-time" },
+            description: "Filtra reservas a partir desta data",
+          },
+          {
+            name: "endDate",
+            in: "query",
+            required: false,
+            schema: { type: "string", format: "date-time" },
+            description: "Filtra reservas até esta data",
           },
         ],
         responses: {
@@ -776,8 +1086,35 @@ const swaggerDocument = {
         },
       },
     },
+    "/visitors/{id}/entry": {
+      patch: {
+        tags: ["Visitantes"],
+        summary: "Registra a entrada de um visitante",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Entrada registrada",
+          },
+          "404": {
+            description: "Visitante não encontrado",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
     "/visitors/{id}/exit": {
-      post: {
+      patch: {
         tags: ["Visitantes"],
         summary: "Registra a saída de um visitante",
         parameters: [
@@ -788,17 +1125,71 @@ const swaggerDocument = {
             schema: { type: "string", format: "uuid" },
           },
         ],
-        requestBody: {
-          required: false,
-          content: {
-            "application/json": {
-              schema: { $ref: "#/components/schemas/VisitorExitInput" },
-            },
-          },
-        },
         responses: {
           "200": {
             description: "Saída registrada",
+          },
+          "404": {
+            description: "Visitante não encontrado",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/visitors/{id}/approve": {
+      patch: {
+        tags: ["Visitantes"],
+        summary: "Aprova a entrada de um visitante",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Visitante aprovado",
+          },
+          "404": {
+            description: "Visitante não encontrado",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/visitors/{id}/reject": {
+      patch: {
+        tags: ["Visitantes"],
+        summary: "Rejeita a entrada de um visitante",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Visitante rejeitado",
+          },
+          "404": {
+            description: "Visitante não encontrado",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
           },
         },
       },
