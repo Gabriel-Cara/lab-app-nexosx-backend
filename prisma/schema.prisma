@@ -62,7 +62,24 @@ model User {
   eventBookings      EventBooking[]
   AreaReservation    AreaReservation[]
 
+  passwordSetupToken PasswordSetupToken?
+
   @@map("users")
+}
+
+model PasswordSetupToken {
+  id     String @id @default(uuid())
+  userId String @unique @map("user-id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tokenHash String    @unique @map("token-hash")
+  expiresAt DateTime  @map("expires-at")
+  usedAt    DateTime? @map("used-at")
+
+  createdAt DateTime @default(now()) @map("created-at")
+
+  @@index([expiresAt])
+  @@map("password-setup-tokens")
 }
 
 model ResidentInfo {
@@ -210,14 +227,14 @@ model AreaReservation {
 }
 
 model AreaTimeSlot {
-  id        String        @id @default(uuid())
-  label     String
-  startsAt  String        @map("starts-at")
-  endsAt    String        @map("ends-at")
-  isActive  Boolean       @default(true) @map("is-active")
-  sortOrder Int?          @map("sort-order")
-  areaId    String        @map("area-id")
-  area      CommonArea    @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  id                String            @id @default(uuid())
+  label             String
+  startsAt          String            @map("starts-at")
+  endsAt            String            @map("ends-at")
+  isActive          Boolean           @default(true) @map("is-active")
+  sortOrder         Int?              @map("sort-order")
+  areaId            String            @map("area-id")
+  area              CommonArea        @relation(fields: [areaId], references: [id], onDelete: Cascade)
   startReservations AreaReservation[] @relation("ReservationStartSlot")
   endReservations   AreaReservation[] @relation("ReservationEndSlot")
 

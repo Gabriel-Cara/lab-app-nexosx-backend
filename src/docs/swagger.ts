@@ -64,17 +64,24 @@ const swaggerDocument = {
       },
       UserInput: {
         type: "object",
-        required: ["name", "email", "role", "password"],
+        required: ["name", "email", "role"],
         properties: {
           name: { type: "string" },
           email: { type: "string", format: "email" },
           phone: { type: "string", nullable: true },
           role: { type: "string", enum: ["admin", "staff", "resident"] },
           apartment: { type: "string", nullable: true },
-          password: { type: "string", minLength: 6 },
+          password: { type: "string", minLength: 6, nullable: true },
           building: { type: "string", nullable: true },
           vehicle: { type: "string", nullable: true },
           emergencyContact: { type: "string", nullable: true },
+        },
+      },
+      UserCreateResponse: {
+        type: "object",
+        properties: {
+          user: { $ref: "#/components/schemas/AuthenticatedUser" },
+          generatedPassword: { type: "string", nullable: true },
         },
       },
       Area: {
@@ -85,6 +92,18 @@ const swaggerDocument = {
           description: { type: "string", nullable: true },
           capacity: { type: "integer", nullable: true },
           available: { type: "boolean" },
+          timeSlots: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string", format: "uuid" },
+                startsAt: { type: "string", example: "08:00" },
+                endsAt: { type: "string", example: "08:30" },
+                sortOrder: { type: "integer", nullable: true },
+              },
+            },
+          },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
         },
@@ -97,6 +116,14 @@ const swaggerDocument = {
           description: { type: "string", nullable: true },
           capacity: { type: "integer", nullable: true },
           available: { type: "boolean" },
+          schedule: {
+            type: "object",
+            properties: {
+              start: { type: "string", example: "08:00" },
+              end: { type: "string", example: "18:00" },
+              stepMinutes: { type: "integer", example: 30 },
+            },
+          },
         },
       },
       Event: {
@@ -330,7 +357,7 @@ const swaggerDocument = {
             description: "Usuário criado",
             content: {
               "application/json": {
-                schema: { $ref: "#/components/schemas/AuthenticatedUser" },
+                schema: { $ref: "#/components/schemas/UserCreateResponse" },
               },
             },
           },

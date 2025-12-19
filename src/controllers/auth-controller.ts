@@ -1,11 +1,12 @@
 import { Request, Response } from "express";
-import { compare } from "bcrypt";
+import { compare, hash } from "bcrypt";
 
 import { AppError } from "@/utils/app-error";
 import { prisma } from "@/database/prisma";
 
-import { loginSchema, userIdParamsSchema } from "@/validators/auth-schemas";
+import { loginSchema, setupPasswordSchema, userIdParamsSchema } from "@/validators/auth-schemas";
 import { signToken } from "@/configs/token";
+import { hashSetupToken } from "@/utils/password-setup-token";
 
 class AuthController {
   async login(request: Request, response: Response) {
@@ -52,6 +53,43 @@ class AuthController {
     }
 
     return response.json(user);
+  }
+
+  async setupPassword(request: Request, response: Response) {
+    const { token, password } = setupPasswordSchema.parse(request.body);
+
+    const tokenHash = hashSetupToken(token);
+
+    const record = await prisma.passwordSetupToken.findUnique({
+      where: { tokenHash },
+    });
+
+    if (!record) {
+      throw new AppError("Invalid token", 400);
+    }
+
+    if (record.usedAt) {
+      throw new AppError("Token already used", 400);
+    }
+
+    if (record.expiresAt.getTime() < Date.now()) {
+      throw new AppError("Token expired", 400);
+    }
+
+    const newHashed = await hash(password, 8);
+
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: record.userId },
+        data: { password: newHashed },
+      }),
+      prisma.passwordSetupToken.update({
+        where: { id: record.id },
+        data: { usedAt: new Date() },
+      }),
+    ]);
+
+    return response.json({ message: "Password set successfully" });
   }
 }
 

@@ -16,13 +16,25 @@ class AreasController {
 
     const areas = await prisma.commonArea.findUnique({
       where: { id },
+      include: {
+        timeSlots: {
+          where: { isActive: true },
+          orderBy: [{ sortOrder: "asc" }, { startsAt: "asc" }],
+          select: {
+            id: true,
+            startsAt: true,
+            endsAt: true,
+            sortOrder: true,
+          },
+        },
+      },
     });
 
     return response.json(areas);
   }
 
   async create(request: Request, response: Response) {
-    const { name, ...data } = createAreaSchema.parse(request.body);
+    const { name, schedule, ...data } = createAreaSchema.parse(request.body);
 
     const existing = await prisma.commonArea.findFirst({ where: { name } });
 
@@ -30,11 +42,28 @@ class AreasController {
       throw new AppError("Area already exists", 400);
     }
 
-    const area = await prisma.commonArea.create({
-      data: {
-        name,
-        ...data,
-      },
+    const area = await prisma.$transaction(async (tx) => {
+      const createdArea = await tx.commonArea.create({
+        data: {
+          name,
+          ...data,
+        },
+      });
+
+      if (schedule) {
+        const slots = buildSlotsFromSchedule(schedule);
+
+        if (slots.length > 0) {
+          await tx.areaTimeSlot.createMany({
+            data: slots.map((slot) => ({
+              ...slot,
+              areaId: createdArea.id,
+            })),
+          });
+        }
+      }
+
+      return createdArea;
     });
 
     return response.status(201).json(area);
@@ -43,6 +72,18 @@ class AreasController {
   async list(_: Request, response: Response) {
     const areas = await prisma.commonArea.findMany({
       orderBy: { name: "asc" },
+      include: {
+        timeSlots: {
+          where: { isActive: true },
+          orderBy: [{ sortOrder: "asc" }, { startsAt: "asc" }],
+          select: {
+            id: true,
+            startsAt: true,
+            endsAt: true,
+            sortOrder: true,
+          },
+        },
+      },
     });
 
     return response.json(areas);
@@ -50,7 +91,7 @@ class AreasController {
 
   async update(request: Request, response: Response) {
     const { id } = areaParamsSchema.parse(request.params);
-    const data = updateAreaSchema.parse(request.body);
+    const { schedule, ...data } = updateAreaSchema.parse(request.body);
 
     const area = await prisma.commonArea.findUnique({ where: { id } });
 
@@ -58,12 +99,55 @@ class AreasController {
       throw new AppError("Area not found", 404);
     }
 
-    const updated = await prisma.commonArea.update({
-      where: { id },
-      data,
+    const updateData = Object.fromEntries(
+      Object.entries(data).filter(([, value]) => value !== undefined)
+    );
+
+    const updated = await prisma.$transaction(async (tx) => {
+      let updatedArea = area;
+
+      if (Object.keys(updateData).length > 0) {
+        updatedArea = await tx.commonArea.update({
+          where: { id },
+          data: updateData,
+        });
+      }
+
+      if (schedule) {
+        const slots = buildSlotsFromSchedule(schedule);
+
+        await tx.areaTimeSlot.updateMany({
+          where: { areaId: id },
+          data: { isActive: false },
+        });
+
+        for (const slot of slots) {
+          await tx.areaTimeSlot.upsert({
+            where: {
+              areaId_startsAt_endsAt: {
+                areaId: id,
+                startsAt: slot.startsAt,
+                endsAt: slot.endsAt,
+              },
+            },
+            update: {
+              label: slot.label,
+              sortOrder: slot.sortOrder,
+              isActive: true,
+            },
+            create: {
+              ...slot,
+              areaId: id,
+              isActive: true,
+            },
+          });
+        }
+      }
+
+      return updatedArea;
     });
 
-    return response.json({ id: updated.id, ...data });
+    return response.json({ id: updated.id, ...updateData });
   }
 
   async delete(request: Request, response: Response) {
@@ -247,3 +331,69 @@ class AreasController {
 }
 
 export { AreasController };
+
+type ScheduleInput = {
+  start: string;
+  end: string;
+  stepMinutes?: number;
+};
+
+function buildSlotsFromSchedule(schedule: ScheduleInput) {
+  const stepMinutes = schedule.stepMinutes ?? 30;
+
+  if (!Number.isInteger(stepMinutes) || stepMinutes <= 0) {
+    throw new AppError("Invalid slot step", 400);
+  }
+
+  const startMinutes = toMinutes(schedule.start);
+  const endMinutes = toMinutes(schedule.end);
+
+  if (endMinutes <= startMinutes) {
+    throw new AppError("End time must be after start time", 400);
+  }
+
+  const slots: {
+    label: string;
+    startsAt: string;
+    endsAt: string;
+    sortOrder: number;
+  }[] = [];
+
+  let order = 0;
+  for (let start = startMinutes; start < endMinutes; start += stepMinutes) {
+    const slotEnd = Math.min(start + stepMinutes, endMinutes);
+    const startsAt = toTimeString(start);
+    const endsAt = toTimeString(slotEnd);
+
+    slots.push({
+      label: `${startsAt} - ${endsAt}`,
+      startsAt,
+      endsAt,
+      sortOrder: order++,
+    });
+  }
+
+  return slots;
+}
+
+function toMinutes(time: string) {
+  const [hoursPart, minutesPart] = time.split(":");
+  const hours = Number(hoursPart);
+  const minutes = Number(minutesPart);
+
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) {
+    throw new AppError("Invalid time format", 400);
+  }
+
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    throw new AppError("Invalid time format", 400);
+  }
+
+  return hours * 60 + minutes;
+}
+
+function toTimeString(totalMinutes: number) {
+  const hours = String(Math.floor(totalMinutes / 60)).padStart(2, "0");
+  const minutes = String(totalMinutes % 60).padStart(2, "0");
+  return `${hours}:${minutes}`;
+}

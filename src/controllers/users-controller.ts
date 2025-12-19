@@ -12,6 +12,14 @@ import {
 } from "@/validators/auth-schemas";
 
 import type { Prisma } from "@prisma/client";
+import { env } from "@/env";
+import { sendEmail } from "@/services/email-service";
+import {
+  generateSetupToken,
+  hashSetupToken,
+} from "@/utils/password-setup-token";
+import { sendPasswordSetupEmail } from "@/services/mail/send-password-setup-email";
+import { generateRandomPassword } from "@/utils/generate-random-password";
 
 class UsersController {
   async create(request: Request, response: Response) {
@@ -33,7 +41,10 @@ class UsersController {
       throw new AppError("User already exists", 400);
     }
 
-    const hashedPassword = await hash(password, 8);
+    // If no password was provided, we still need to store a hash in the DB.
+    // We'll use a strong random value so the resident cannot log in until setting their own password.
+    const generatedPassword = password ?? generateRandomPassword(32);
+    const hashedPassword = await hash(generatedPassword, 8);
 
     const created = await prisma.user.create({
       data: {
@@ -57,7 +68,85 @@ class UsersController {
       },
     });
 
-    return response.status(201).json(created);
+    // Invite flow: if staff created a resident without specifying a password,
+    // send an email with a one-time token so the resident can set their own password.
+    if (role === "resident" && !password) {
+      const token = generateSetupToken();
+      const tokenHash = hashSetupToken(token);
+
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+      await prisma.passwordSetupToken.upsert({
+        where: { userId: created.id },
+        update: {
+          tokenHash,
+          expiresAt,
+          usedAt: null,
+        },
+        create: {
+          userId: created.id,
+          tokenHash,
+          expiresAt,
+        },
+      });
+
+      const link = `${env.FRONT_URL}/primeiro-acesso?token=${token}`;
+
+      await sendEmail({
+        to: created.email,
+        subject: "Defina sua senha de acesso",
+        html: `
+          <div style="font-family: Arial, sans-serif; line-height: 1.5;">
+            <p>Olá, ${created.name}.</p>
+            <p>Para criar sua senha e acessar o sistema, clique no link abaixo. Ele expira em 1 hora.</p>
+            <p><a href="${link}">Criar minha senha</a></p>
+            <p>Se você não solicitou este acesso, pode ignorar este e-mail.</p>
+          </div>
+        `,
+      });
+    }
+
+    return response.status(201).json({
+      user: {
+        id: created.id,
+        name: created.name,
+        email: created.email,
+        role: created.role,
+      },
+    });
+  }
+
+  async resendInvite(request: Request, response: Response) {
+    const userId = request.params.id;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user || user.role !== "resident") {
+      return response.status(404).json({ message: "Morador não encontrado" });
+    }
+
+    const token = generateSetupToken();
+    const tokenHash = hashSetupToken(token);
+
+    await prisma.passwordSetupToken.upsert({
+      where: { userId },
+      update: {
+        tokenHash,
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        usedAt: null,
+      },
+      create: {
+        userId,
+        tokenHash,
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      },
+    });
+
+    await sendPasswordSetupEmail(user.email, user.name, token);
+
+    return response.json({ message: "Convite reenviado com sucesso" });
   }
 
   async list(request: Request, response: Response) {
