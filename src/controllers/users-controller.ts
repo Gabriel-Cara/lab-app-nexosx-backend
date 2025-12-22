@@ -12,8 +12,6 @@ import {
 } from "@/validators/auth-schemas";
 
 import type { Prisma } from "@prisma/client";
-import { env } from "@/env";
-import { sendEmail } from "@/services/email-service";
 import {
   generateSetupToken,
   hashSetupToken,
@@ -90,20 +88,7 @@ class UsersController {
         },
       });
 
-      const link = `${env.FRONT_URL}/primeiro-acesso?token=${token}`;
-
-      await sendEmail({
-        to: created.email,
-        subject: "Defina sua senha de acesso",
-        html: `
-          <div style="font-family: Arial, sans-serif; line-height: 1.5;">
-            <p>Olá, ${created.name}.</p>
-            <p>Para criar sua senha e acessar o sistema, clique no link abaixo. Ele expira em 1 hora.</p>
-            <p><a href="${link}">Criar minha senha</a></p>
-            <p>Se você não solicitou este acesso, pode ignorar este e-mail.</p>
-          </div>
-        `,
-      });
+      await sendPasswordSetupEmail(email, name, token);
     }
 
     return response.status(201).json({
