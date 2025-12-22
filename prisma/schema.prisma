@@ -126,7 +126,10 @@ model VisitLog {
 
 model Package {
   id            String         @id @default(uuid())
-  code          String         @unique
+  codeHash      String         @unique @map("code-hash")
+  codeExpiresAt DateTime       @map("code-expires-at")
+  codeAttempts  Int            @default(0) @map("code-attempts")
+  codeHint      String?        @map("code-hint")
   description   String
   carrier       String?
   type          PackageType

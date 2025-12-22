@@ -68,7 +68,12 @@ const swaggerDocument = {
         properties: {
           name: { type: "string" },
           email: { type: "string", format: "email" },
-          phone: { type: "string", nullable: true },
+          phone: {
+            type: "string",
+            nullable: true,
+            example: "+5511999999999",
+            description: "Telefone em formato E.164 (+55 + DDD + número).",
+          },
           role: { type: "string", enum: ["admin", "staff", "resident"] },
           apartment: { type: "string", nullable: true },
           password: { type: "string", minLength: 6, nullable: true },
@@ -270,7 +275,12 @@ const swaggerDocument = {
         properties: {
           name: { type: "string" },
           document: { type: "string" },
-          phone: { type: "string", nullable: true },
+          phone: {
+            type: "string",
+            nullable: true,
+            example: "+5511999999999",
+            description: "Telefone em formato E.164 (+55 + DDD + número).",
+          },
           visitReason: { type: "string", nullable: true },
           hostId: { type: "string", format: "uuid" },
         },

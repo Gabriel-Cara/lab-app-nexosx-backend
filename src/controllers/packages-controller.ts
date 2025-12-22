@@ -3,6 +3,8 @@ import { syncDelayedPackages } from "@/services/package-status-service";
 import { notifyResident } from "@/services/notification-service";
 import { AppError } from "@/utils/app-error";
 import { generateCode } from "@/utils/generate-code";
+import bcrypt from "bcrypt";
+import { env } from "@/env";
 import {
   packageCreateSchema,
   packageParamsSchema,
@@ -16,10 +18,16 @@ class PackagesController {
       packageCreateSchema.parse(request.body);
 
     const code = generateCode(6);
+    const codeHash = await bcrypt.hash(code, 10);
+    const expiresAt = new Date(Date.now() + env.PACKAGE_CODE_TTL_MINUTES * 60 * 1000);
+    const codeHint = `**${code.slice(-2)}`;
 
     const pkg = await prisma.package.create({
       data: {
-        code,
+        codeHash,
+        codeExpiresAt: expiresAt,
+        codeAttempts: 0,
+        codeHint,
         residentId,
         description,
         carrier: carrier ?? null,
@@ -27,20 +35,27 @@ class PackagesController {
         status: "pending",
         createdById: request.user!.id,
       },
-      include: {
-        resident: {
-          select: {
-            name: true,
-            phone: true,
-          },
-        },
+      select: {
+        id: true,
+        description: true,
+        carrier: true,
+        type: true,
+        status: true,
+        receivedAt: true,
+        retrievedAt: true,
+        deliveredAt: true,
+        codeExpiresAt: true,
+        codeHint: true,
+        residentId: true,
+        createdById: true,
+        resident: { select: { name: true, phone: true } },
       },
     });
 
     if (pkg.resident.phone) {
       await notifyResident({
         phone: pkg.resident.phone,
-        message: `Olá ${pkg.resident.name}, sua encomenda chegou! Código: ${code}`,
+        message: `Olá ${pkg.resident.name}, sua encomenda chegou! Código de retirada: ${code}. (Válido por ${env.PACKAGE_CODE_TTL_MINUTES} minutos)`,
       });
     }
 
@@ -56,7 +71,19 @@ class PackagesController {
 
     const packages = await prisma.package.findMany({
       ...(where ? { where } : {}),
-      include: {
+      select: {
+        id: true,
+        description: true,
+        carrier: true,
+        type: true,
+        status: true,
+        receivedAt: true,
+        retrievedAt: true,
+        deliveredAt: true,
+        codeExpiresAt: true,
+        codeHint: true,
+        residentId: true,
+        createdById: true,
         resident: { select: { name: true, apartment: true, phone: true } },
         createdBy: { select: { name: true } },
       },
@@ -81,7 +108,24 @@ class PackagesController {
       throw new AppError("Package not found", 404);
     }
 
-    if (parsed.code !== pkg.code) {
+    if (pkg.status === "retrieved") {
+      throw new AppError("Package already retrieved", 400);
+    }
+
+    if (new Date() > pkg.codeExpiresAt) {
+      throw new AppError("Código expirado", 400);
+    }
+
+    if (pkg.codeAttempts >= env.PACKAGE_CODE_MAX_ATTEMPTS) {
+      throw new AppError("Número máximo de tentativas atingido!", 429);
+    }
+
+    const isValid = await bcrypt.compare(parsed.code, pkg.codeHash);
+    if (!isValid) {
+      await prisma.package.update({
+        where: { id },
+        data: { codeAttempts: { increment: 1 } },
+      });
       throw new AppError("Invalid code", 400);
     }
 
@@ -90,12 +134,27 @@ class PackagesController {
       data: {
         retrievedAt: new Date(),
         status: "retrieved",
+        codeAttempts: 0,
         retrievalLogs: {
           create: {
             verifiedById: request.user!.id,
             method: "codigo",
           },
         },
+      },
+      select: {
+        id: true,
+        description: true,
+        carrier: true,
+        type: true,
+        status: true,
+        receivedAt: true,
+        retrievedAt: true,
+        deliveredAt: true,
+        codeExpiresAt: true,
+        codeHint: true,
+        residentId: true,
+        createdById: true,
       },
     });
 
@@ -119,6 +178,20 @@ class PackagesController {
       where: { id },
       data: {
         status: "cancelled",
+      },
+      select: {
+        id: true,
+        description: true,
+        carrier: true,
+        type: true,
+        status: true,
+        receivedAt: true,
+        retrievedAt: true,
+        deliveredAt: true,
+        codeExpiresAt: true,
+        codeHint: true,
+        residentId: true,
+        createdById: true,
       },
     });
 

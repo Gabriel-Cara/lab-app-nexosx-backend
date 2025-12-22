@@ -1,4 +1,25 @@
 import { z } from "zod";
+import { normalizePhoneE164 } from "@/utils/phone";
+
+const phoneSchema = z.string().transform((value, ctx) => {
+  const normalized = normalizePhoneE164(value);
+
+  if (!normalized) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Telefone inválido. Use DDD + número.",
+    });
+    return z.NEVER;
+  }
+
+  return normalized;
+});
+
+const optionalPhoneSchema = z.preprocess(
+  (value) =>
+    typeof value === "string" && value.trim().length === 0 ? undefined : value,
+  phoneSchema.optional()
+);
 
 export const loginSchema = z.object({
   email: z.string().email(),
@@ -8,7 +29,7 @@ export const loginSchema = z.object({
 export const userCreateSchema = z.object({
   name: z.string().min(3),
   email: z.string().email(),
-  phone: z.string().min(8).optional(),
+  phone: optionalPhoneSchema,
   role: z.enum(["admin", "staff", "resident"]),
   apartment: z.string().optional(),
   password: z.string().min(6).optional(),
@@ -20,7 +41,7 @@ export const userCreateSchema = z.object({
 export const userUpdateSchema = z.object({
   name: z.string().min(3).optional(),
   email: z.string().email().optional(),
-  phone: z.string().min(8).optional(),
+  phone: optionalPhoneSchema,
   role: z.enum(["admin", "staff", "resident"]).optional(),
   apartment: z.string().optional(),
   password: z.string().min(6).optional(),
@@ -30,7 +51,7 @@ export const userUpdateSchema = z.object({
 });
 
 export const updateProfileSchema = z.object({
-  phone: z.string().optional(),
+  phone: optionalPhoneSchema,
   vehicle: z.string().optional(),
   emergencyContact: z.string().optional(),
 });

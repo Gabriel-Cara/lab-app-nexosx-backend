@@ -13,4 +13,4 @@ export const packageParamsSchema = z.object({
 
 export const packageRetrieveSchema = z.object({
   code: z.string(),
-})
+});
