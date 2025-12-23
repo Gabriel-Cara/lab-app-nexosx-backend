@@ -183,6 +183,22 @@ const swaggerDocument = {
           residentId: { type: "string", format: "uuid" },
           description: { type: "string" },
           carrier: { type: "string" },
+          type: {
+            type: "string",
+            enum: ["box", "envelope", "food", "others"],
+          },
+        },
+      },
+      PackageUpdateInput: {
+        type: "object",
+        properties: {
+          residentId: { type: "string", format: "uuid" },
+          description: { type: "string" },
+          carrier: { type: "string", nullable: true },
+          type: {
+            type: "string",
+            enum: ["box", "envelope", "food", "others"],
+          },
         },
       },
       PackageRetrieveInput: {
@@ -860,6 +876,79 @@ const swaggerDocument = {
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/Package" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/packages/{id}": {
+      patch: {
+        tags: ["Encomendas"],
+        summary: "Atualiza os dados de uma encomenda",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/PackageUpdateInput" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Encomenda atualizada",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/Package" },
+              },
+            },
+          },
+          "400": {
+            description: "Dados inválidos",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "404": {
+            description: "Encomenda não encontrada",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+      delete: {
+        tags: ["Encomendas"],
+        summary: "Remove uma encomenda",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: {
+          "204": {
+            description: "Encomenda removida",
+          },
+          "404": {
+            description: "Encomenda não encontrada",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
               },
             },
           },

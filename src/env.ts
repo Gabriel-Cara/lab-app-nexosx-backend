@@ -21,7 +21,7 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string(),
   // For local/testing with Resend you can use: onboarding@resend.dev
   MAIL_FROM: z.string().default("onboarding@resend.dev"),
-  PORT: z.coerce.number().default(3333)
+  PORT: z.coerce.number().default(3334)
 });
 
 export const env = envSchema.parse(process.env);

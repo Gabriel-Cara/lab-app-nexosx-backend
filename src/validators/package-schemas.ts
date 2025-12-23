@@ -7,6 +7,13 @@ export const packageCreateSchema = z.object({
   type: z.enum(["box", "envelope", "food", "others"]).default("others"),
 });
 
+export const packageUpdateSchema = z.object({
+  residentId: z.uuid().optional(),
+  description: z.string().min(3).optional(),
+  carrier: z.string().optional(),
+  type: z.enum(["box", "envelope", "food", "others"]).optional(),
+});
+
 export const packageParamsSchema = z.object({
   id: z.uuid(),
 })

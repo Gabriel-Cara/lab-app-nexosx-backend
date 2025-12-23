@@ -3,12 +3,14 @@ import { syncDelayedPackages } from "@/services/package-status-service";
 import { notifyResident } from "@/services/notification-service";
 import { AppError } from "@/utils/app-error";
 import { generateCode } from "@/utils/generate-code";
+import { PackageType } from "@prisma/client";
 import bcrypt from "bcrypt";
 import { env } from "@/env";
 import {
   packageCreateSchema,
   packageParamsSchema,
   packageRetrieveSchema,
+  packageUpdateSchema,
 } from "@/validators/package-schemas";
 import { Request, Response } from "express";
 
@@ -91,6 +93,57 @@ class PackagesController {
     });
 
     return response.json(packages);
+  }
+
+  async update(request: Request, response: Response) {
+    const { id } = packageParamsSchema.parse(request.params);
+    const { residentId, description, carrier, type } =
+      packageUpdateSchema.parse(request.body);
+
+    const pkg = await prisma.package.findUnique({ where: { id } });
+
+    if (!pkg) {
+      throw new AppError("Package not found", 404);
+    }
+
+    const data: {
+      residentId?: string;
+      description?: string;
+      carrier?: string | null;
+      type?: PackageType;
+    } = {};
+
+    if (residentId !== undefined) data.residentId = residentId;
+    if (description !== undefined) data.description = description;
+    if (carrier !== undefined) data.carrier = carrier ? carrier : null;
+    if (type !== undefined) data.type = type;
+
+    if (Object.keys(data).length === 0) {
+      throw new AppError("No data provided", 400);
+    }
+
+    const updated = await prisma.package.update({
+      where: { id },
+      data,
+      select: {
+        id: true,
+        description: true,
+        carrier: true,
+        type: true,
+        status: true,
+        receivedAt: true,
+        retrievedAt: true,
+        deliveredAt: true,
+        codeExpiresAt: true,
+        codeHint: true,
+        residentId: true,
+        createdById: true,
+        resident: { select: { name: true, apartment: true, phone: true } },
+        createdBy: { select: { name: true } },
+      },
+    });
+
+    return response.json(updated);
   }
 
   async retrieve(request: Request, response: Response) {
@@ -196,6 +249,23 @@ class PackagesController {
     });
 
     return response.json({ updated });
+  }
+
+  async delete(request: Request, response: Response) {
+    const { id } = packageParamsSchema.parse(request.params);
+
+    const pkg = await prisma.package.findUnique({ where: { id } });
+
+    if (!pkg) {
+      throw new AppError("Package not found", 404);
+    }
+
+    await prisma.$transaction([
+      prisma.retrievalLog.deleteMany({ where: { packageId: id } }),
+      prisma.package.delete({ where: { id } }),
+    ]);
+
+    return response.status(204).json();
   }
 }
 
