@@ -1,5 +1,6 @@
 import { prisma } from "@/database/prisma";
 import { AppError } from "@/utils/app-error";
+import { buildSlotsFromSchedule } from "@/utils/area-slots";
 import { combineDateWithTime, normalizeDate } from "@/utils/datetime";
 import {
   areaParamsSchema,
@@ -159,7 +160,18 @@ class AreasController {
       throw new AppError("Area not found", 404);
     }
 
-    await prisma.commonArea.delete({ where: { id } });
+    const events = await prisma.event.findMany({
+      where: { commonAreaId: id },
+      select: { id: true },
+    });
+    const eventIds = events.map((event) => event.id);
+
+    await prisma.$transaction([
+      prisma.eventLike.deleteMany({ where: { eventId: { in: eventIds } } }),
+      prisma.eventBooking.deleteMany({ where: { eventId: { in: eventIds } } }),
+      prisma.event.deleteMany({ where: { id: { in: eventIds } } }),
+      prisma.commonArea.delete({ where: { id } }),
+    ]);
 
     return response.status(204).json();
   }
@@ -213,17 +225,24 @@ class AreasController {
       },
     });
 
+    const reservationsByDay = new Map<number, typeof reservations>();
+    for (const reservation of reservations) {
+      const dayKey = new Date(reservation.date);
+      dayKey.setHours(0, 0, 0, 0);
+      const key = dayKey.getTime();
+      const list = reservationsByDay.get(key);
+      if (list) {
+        list.push(reservation);
+      } else {
+        reservationsByDay.set(key, [reservation]);
+      }
+    }
+
     const days = Array.from({ length: totalDays }).map((_, index) => {
       const dayStart = new Date(startDate);
       dayStart.setDate(dayStart.getDate() + index);
 
-      const dayEnd = new Date(dayStart);
-      dayEnd.setDate(dayEnd.getDate() + 1);
-
-      const dayReservations = reservations.filter(
-        (reservation) =>
-          reservation.date >= dayStart && reservation.date < dayEnd
-      );
+      const dayReservations = reservationsByDay.get(dayStart.getTime()) ?? [];
 
       const slots = area.timeSlots.map((slot) => {
         const slotStart = combineDateWithTime(dayStart, slot.startsAt);
@@ -331,69 +350,3 @@ class AreasController {
 }
 
 export { AreasController };
-
-type ScheduleInput = {
-  start: string;
-  end: string;
-  stepMinutes?: number;
-};
-
-function buildSlotsFromSchedule(schedule: ScheduleInput) {
-  const stepMinutes = schedule.stepMinutes ?? 30;
-
-  if (!Number.isInteger(stepMinutes) || stepMinutes <= 0) {
-    throw new AppError("Invalid slot step", 400);
-  }
-
-  const startMinutes = toMinutes(schedule.start);
-  const endMinutes = toMinutes(schedule.end);
-
-  if (endMinutes <= startMinutes) {
-    throw new AppError("End time must be after start time", 400);
-  }
-
-  const slots: {
-    label: string;
-    startsAt: string;
-    endsAt: string;
-    sortOrder: number;
-  }[] = [];
-
-  let order = 0;
-  for (let start = startMinutes; start < endMinutes; start += stepMinutes) {
-    const slotEnd = Math.min(start + stepMinutes, endMinutes);
-    const startsAt = toTimeString(start);
-    const endsAt = toTimeString(slotEnd);
-
-    slots.push({
-      label: `${startsAt} - ${endsAt}`,
-      startsAt,
-      endsAt,
-      sortOrder: order++,
-    });
-  }
-
-  return slots;
-}
-
-function toMinutes(time: string) {
-  const [hoursPart, minutesPart] = time.split(":");
-  const hours = Number(hoursPart);
-  const minutes = Number(minutesPart);
-
-  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) {
-    throw new AppError("Invalid time format", 400);
-  }
-
-  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
-    throw new AppError("Invalid time format", 400);
-  }
-
-  return hours * 60 + minutes;
-}
-
-function toTimeString(totalMinutes: number) {
-  const hours = String(Math.floor(totalMinutes / 60)).padStart(2, "0");
-  const minutes = String(totalMinutes % 60).padStart(2, "0");
-  return `${hours}:${minutes}`;
-}

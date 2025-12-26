@@ -47,6 +47,7 @@ model User {
   name               String
   email              String            @unique
   phone              String?
+  imageUrl           String?           @map("image-url")
   password           String
   role               Role              @default(resident)
   apartment          String?
@@ -63,6 +64,7 @@ model User {
   AreaReservation    AreaReservation[]
 
   passwordSetupToken PasswordSetupToken?
+  eventLikes         EventLike[]
 
   @@map("users")
 }
@@ -119,6 +121,7 @@ model VisitLog {
   handledBy   User?         @relation("handled-by", fields: [handledById], references: [id])
   handledById String?
   status      VisitorStatus @default(pending)
+  imageUrl    String?       @map("image-url")
   createdAt   DateTime      @default(now()) @map("created-at")
 
   @@map("visit-logs")
@@ -134,6 +137,7 @@ model Package {
   carrier       String?
   type          PackageType
   status        PackageStatus  @default(pending)
+  imageUrl      String?        @map("image-url")
   receivedAt    DateTime       @default(now()) @map("received-at")
   retrievedAt   DateTime?      @map("retrieved-at")
   deliveredAt   DateTime?      @map("delivered-at")
@@ -167,11 +171,14 @@ model Event {
   location     CommonArea @relation(fields: [commonAreaId], references: [id])
 
   capacity    Int
+  allowBookings Boolean       @default(true) @map("allow-bookings")
+  imageUrl    String?         @map("image-url")
   startDate   DateTime       @map("start-date")
   endDate     DateTime       @map("end-date")
   createdBy   User           @relation("event-created-by", fields: [createdById], references: [id])
   createdById String
   bookings    EventBooking[]
+  likes       EventLike[]
 
   @@map("events")
 }
@@ -185,7 +192,20 @@ model EventBooking {
   notes      String?
   createdAt  DateTime @default(now()) @map("created-at")
 
+  @@unique([eventId, residentId])
   @@map("events-booking")
+}
+
+model EventLike {
+  id        String   @id @default(uuid())
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId   String   @map("event-id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String   @map("user-id")
+  createdAt DateTime @default(now()) @map("created-at")
+
+  @@unique([eventId, userId])
+  @@map("event-likes")
 }
 
 model CommonArea {
@@ -194,6 +214,7 @@ model CommonArea {
   description String?
   capacity    Int?
   available   Boolean  @default(true)
+  imageUrl    String?  @map("image-url")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

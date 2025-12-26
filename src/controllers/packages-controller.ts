@@ -1,9 +1,8 @@
 import { prisma } from "@/database/prisma";
-import { syncDelayedPackages } from "@/services/package-status-service";
 import { notifyResident } from "@/services/notification-service";
 import { AppError } from "@/utils/app-error";
 import { generateCode } from "@/utils/generate-code";
-import { PackageType } from "@prisma/client";
+import { PackageType, Prisma } from "@prisma/client";
 import bcrypt from "bcrypt";
 import { env } from "@/env";
 import {
@@ -43,6 +42,7 @@ class PackagesController {
         carrier: true,
         type: true,
         status: true,
+        imageUrl: true,
         receivedAt: true,
         retrievedAt: true,
         deliveredAt: true,
@@ -69,8 +69,6 @@ class PackagesController {
 
     const where = role === "resident" ? { residentId: id } : undefined;
 
-    await syncDelayedPackages();
-
     const packages = await prisma.package.findMany({
       ...(where ? { where } : {}),
       select: {
@@ -79,6 +77,7 @@ class PackagesController {
         carrier: true,
         type: true,
         status: true,
+        imageUrl: true,
         receivedAt: true,
         retrievedAt: true,
         deliveredAt: true,
@@ -131,6 +130,7 @@ class PackagesController {
         carrier: true,
         type: true,
         status: true,
+        imageUrl: true,
         receivedAt: true,
         retrievedAt: true,
         deliveredAt: true,
@@ -154,64 +154,112 @@ class PackagesController {
     }
 
     const parsed = packageRetrieveSchema.parse(request.body);
+    const userId = request.user!.id;
+    const now = new Date();
 
-    const pkg = await prisma.package.findUnique({ where: { id } });
+    try {
+      const updated = await prisma.$transaction(
+        async (tx) => {
+          const pkg = await tx.package.findUnique({
+            where: { id },
+            select: {
+              id: true,
+              status: true,
+              codeExpiresAt: true,
+              codeAttempts: true,
+              codeHash: true,
+            },
+          });
 
-    if (!pkg) {
-      throw new AppError("Package not found", 404);
-    }
+          if (!pkg) {
+            throw new AppError("Package not found", 404);
+          }
 
-    if (pkg.status === "retrieved") {
-      throw new AppError("Package already retrieved", 400);
-    }
+          if (pkg.status === "retrieved") {
+            throw new AppError("Package already retrieved", 400);
+          }
 
-    if (new Date() > pkg.codeExpiresAt) {
-      throw new AppError("Código expirado", 400);
-    }
+          if (now > pkg.codeExpiresAt) {
+            throw new AppError("Código expirado", 400);
+          }
 
-    if (pkg.codeAttempts >= env.PACKAGE_CODE_MAX_ATTEMPTS) {
-      throw new AppError("Número máximo de tentativas atingido!", 429);
-    }
+          if (pkg.codeAttempts >= env.PACKAGE_CODE_MAX_ATTEMPTS) {
+            throw new AppError("Número máximo de tentativas atingido!", 429);
+          }
 
-    const isValid = await bcrypt.compare(parsed.code, pkg.codeHash);
-    if (!isValid) {
-      await prisma.package.update({
-        where: { id },
-        data: { codeAttempts: { increment: 1 } },
-      });
-      throw new AppError("Invalid code", 400);
-    }
+          const isValid = await bcrypt.compare(parsed.code, pkg.codeHash);
+          if (!isValid) {
+            await tx.package.update({
+              where: { id },
+              data: { codeAttempts: { increment: 1 } },
+            });
+            throw new AppError("Invalid code", 400);
+          }
 
-    const updated = await prisma.package.update({
-      where: { id },
-      data: {
-        retrievedAt: new Date(),
-        status: "retrieved",
-        codeAttempts: 0,
-        retrievalLogs: {
-          create: {
-            verifiedById: request.user!.id,
-            method: "codigo",
-          },
+          const updateResult = await tx.package.updateMany({
+            where: {
+              id,
+              status: { not: "retrieved" },
+            },
+            data: {
+              retrievedAt: now,
+              status: "retrieved",
+              codeAttempts: 0,
+            },
+          });
+
+          if (updateResult.count === 0) {
+            throw new AppError("Package already retrieved", 400);
+          }
+
+          await tx.retrievalLog.create({
+            data: {
+              packageId: id,
+              verifiedById: userId,
+              method: "codigo",
+            },
+          });
+
+          return tx.package.findUnique({
+            where: { id },
+            select: {
+              id: true,
+              description: true,
+              carrier: true,
+              type: true,
+              status: true,
+              imageUrl: true,
+              receivedAt: true,
+              retrievedAt: true,
+              deliveredAt: true,
+              codeExpiresAt: true,
+              codeHint: true,
+              residentId: true,
+              createdById: true,
+            },
+          });
         },
-      },
-      select: {
-        id: true,
-        description: true,
-        carrier: true,
-        type: true,
-        status: true,
-        receivedAt: true,
-        retrievedAt: true,
-        deliveredAt: true,
-        codeExpiresAt: true,
-        codeHint: true,
-        residentId: true,
-        createdById: true,
-      },
-    });
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+      );
 
-    return response.json(updated);
+      if (!updated) {
+        throw new AppError("Package not found", 404);
+      }
+
+      return response.json(updated);
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === "P2034") {
+          throw new AppError("Conflict detected, please try again", 409);
+        }
+      }
+
+      throw error;
+    }
   }
 
   async cancel(request: Request, response: Response) {
@@ -238,6 +286,7 @@ class PackagesController {
         carrier: true,
         type: true,
         status: true,
+        imageUrl: true,
         receivedAt: true,
         retrievedAt: true,
         deliveredAt: true,

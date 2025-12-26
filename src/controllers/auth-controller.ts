@@ -7,12 +7,22 @@ import { prisma } from "@/database/prisma";
 import { loginSchema, setupPasswordSchema, userIdParamsSchema } from "@/validators/auth-schemas";
 import { signToken } from "@/configs/token";
 import { hashSetupToken } from "@/utils/password-setup-token";
+import { userSelect } from "@/utils/user-select";
 
 class AuthController {
   async login(request: Request, response: Response) {
     const { email, password } = loginSchema.parse(request.body);
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        password: true,
+        role: true,
+      },
+    });
 
     if (!user) {
       throw new AppError("Invalid credentials", 401);
@@ -40,12 +50,13 @@ class AuthController {
   async me(request: Request, response: Response) {
     const { id } = userIdParamsSchema.parse(request.params);
 
-    if (!id) {
-      throw new AppError("Invalid JWT token", 401);
+    if (!request.user || request.user.id !== id) {
+      throw new AppError("Unauthorized", 403);
     }
 
     const user = await prisma.user.findUnique({
       where: { id },
+      select: userSelect,
     });
 
     if (!user) {

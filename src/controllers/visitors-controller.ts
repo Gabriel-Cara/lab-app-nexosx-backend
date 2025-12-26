@@ -152,20 +152,34 @@ class VisitorsController {
       throw new AppError("Visitor does not have a pending visit to approve", 400);
     }
 
-    const updatedLog = await prisma.visitLog.update({
-      where: { id: log.id },
-      data: { status: "authorized" },
-      include: {
-        visitor: true,
-        host: true,
-        handledBy: true,
-      },
+    const updatedLog = await prisma.$transaction(async (tx) => {
+      const updateResult = await tx.visitLog.updateMany({
+        where: { id: log.id, status: "pending" },
+        data: { status: "authorized" },
+      });
+
+      if (updateResult.count === 0) {
+        throw new AppError("Visitor does not have a pending visit to approve", 400);
+      }
+
+      await tx.visitor.update({
+        where: { id: visitorId },
+        data: { status: "authorized" },
+      });
+
+      return tx.visitLog.findUnique({
+        where: { id: log.id },
+        include: {
+          visitor: true,
+          host: true,
+          handledBy: true,
+        },
+      });
     });
 
-    await prisma.visitor.update({
-      where: { id: visitorId },
-      data: { status: "authorized" },
-    });
+    if (!updatedLog) {
+      throw new AppError("Visitor does not have a pending visit to approve", 400);
+    }
 
     return response.json(updatedLog);
   }
@@ -191,20 +205,34 @@ class VisitorsController {
       throw new AppError("Visitor does not have a pending visit to reject", 400);
     }
 
-    const updatedLog = await prisma.visitLog.update({
-      where: { id: log.id },
-      data: { status: "denied" },
-      include: {
-        visitor: true,
-        host: true,
-        handledBy: true,
-      },
+    const updatedLog = await prisma.$transaction(async (tx) => {
+      const updateResult = await tx.visitLog.updateMany({
+        where: { id: log.id, status: "pending" },
+        data: { status: "denied" },
+      });
+
+      if (updateResult.count === 0) {
+        throw new AppError("Visitor does not have a pending visit to reject", 400);
+      }
+
+      await tx.visitor.update({
+        where: { id: visitorId },
+        data: { status: "denied" },
+      });
+
+      return tx.visitLog.findUnique({
+        where: { id: log.id },
+        include: {
+          visitor: true,
+          host: true,
+          handledBy: true,
+        },
+      });
     });
 
-    await prisma.visitor.update({
-      where: { id: visitorId },
-      data: { status: "denied" },
-    });
+    if (!updatedLog) {
+      throw new AppError("Visitor does not have a pending visit to reject", 400);
+    }
 
     return response.json(updatedLog);
   }
