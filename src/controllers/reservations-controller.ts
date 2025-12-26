@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 
 import { prisma } from "@/database/prisma";
 import { AppError } from "@/utils/app-error";
+import { Prisma } from "@prisma/client";
 import {
   actionSchema,
   createReservationSchema,
@@ -19,73 +20,93 @@ class ReservationsController {
       createReservationSchema.parse(request.body);
 
     const reservationDate = normalizeDate(date)
+    const residentId = request.user!.id;
 
-    const slots = await prisma.areaTimeSlot.findMany({
-      where: { id: { in: [startSlotId, endSlotId] } },
-    })
+    try {
+      const created = await prisma.$transaction(
+        async (tx) => {
+          const slots = await tx.areaTimeSlot.findMany({
+            where: { id: { in: [startSlotId, endSlotId] } },
+          });
 
-    const startSlot = slots.find((slot) => slot.id === startSlotId)
-    const endSlot = slots.find((slot) => slot.id === endSlotId)
+          const startSlot = slots.find((slot) => slot.id === startSlotId);
+          const endSlot = slots.find((slot) => slot.id === endSlotId);
 
-    if (!startSlot || startSlot.areaId !== areaId || !startSlot.isActive) {
-      throw new AppError("Invalid start slot for this area", 400)
-    }
+          if (!startSlot || startSlot.areaId !== areaId || !startSlot.isActive) {
+            throw new AppError("Invalid start slot for this area", 400);
+          }
 
-    if (!endSlot || endSlot.areaId !== areaId || !endSlot.isActive) {
-      throw new AppError("Invalid end slot for this area", 400)
-    }
+          if (!endSlot || endSlot.areaId !== areaId || !endSlot.isActive) {
+            throw new AppError("Invalid end slot for this area", 400);
+          }
 
-    const startMinutes = minutesFromTime(startSlot.startsAt)
-    const endMinutes = minutesFromTime(endSlot.endsAt)
+          const startMinutes = minutesFromTime(startSlot.startsAt);
+          const endMinutes = minutesFromTime(endSlot.endsAt);
 
-    if (endMinutes <= startMinutes) {
-      throw new AppError("End time must be after start time", 400)
-    }
+          if (endMinutes <= startMinutes) {
+            throw new AppError("End time must be after start time", 400);
+          }
 
-    const startTime = combineDateWithTime(reservationDate, startSlot.startsAt)
-    const endTime = combineDateWithTime(reservationDate, endSlot.endsAt)
+          const startTime = combineDateWithTime(reservationDate, startSlot.startsAt);
+          const endTime = combineDateWithTime(reservationDate, endSlot.endsAt);
 
-    const conflict = await prisma.areaReservation.findFirst({
-      where: {
-        areaId: areaId,
-        date: reservationDate,
-        OR: [
-          {
-            startTime: { lt: new Date(endTime) },
-            endTime: { gt: new Date(startTime) },
-          },
-        ],
-        status: { in: ["pending", "approved"] },
-      },
-    });
+          const conflict = await tx.areaReservation.findFirst({
+            where: {
+              areaId: areaId,
+              date: reservationDate,
+              OR: [
+                {
+                  startTime: { lt: new Date(endTime) },
+                  endTime: { gt: new Date(startTime) },
+                },
+              ],
+              status: { in: ["pending", "approved"] },
+            },
+          });
 
-    if (conflict) {
-      throw new AppError("Conflict detected, please try another time", 409);
-    }
+          if (conflict) {
+            throw new AppError("Conflict detected, please try another time", 409);
+          }
 
-    const created = await prisma.areaReservation.create({
-      data: {
-        areaId,
-        residentId: request.user!.id,
-        date: reservationDate,
-        startTime,
-        endTime,
-        startSlotId,
-        endSlotId,
-        purpose,
-      },
-      include: {
-        resident: {
-          select: {
-            name: true,
-            apartment: true,
-            phone: true,
-          },
+          return tx.areaReservation.create({
+            data: {
+              areaId,
+              residentId,
+              date: reservationDate,
+              startTime,
+              endTime,
+              startSlotId,
+              endSlotId,
+              purpose,
+            },
+            include: {
+              resident: {
+                select: {
+                  name: true,
+                  apartment: true,
+                  phone: true,
+                },
+              },
+            },
+          });
         },
-      },
-    });
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+      );
 
-    return response.status(201).json(created);
+      return response.status(201).json(created);
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === "P2034") {
+          throw new AppError("Conflict detected, please try another time", 409);
+        }
+      }
+
+      throw error;
+    }
   }
 
   async list(request: Request, response: Response) {

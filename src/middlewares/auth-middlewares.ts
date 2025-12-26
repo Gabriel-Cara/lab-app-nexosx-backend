@@ -14,7 +14,11 @@ const authenticate = (
       throw new AppError("JWT token not found", 401);
     }
 
-    const [, token] = authHeader.split(" ");
+    const [scheme, token] = authHeader.split(" ");
+
+    if (!token || scheme?.toLowerCase() !== "bearer") {
+      throw new AppError("Invalid JWT token", 401);
+    }
 
     const payload = verifyToken(token);
 

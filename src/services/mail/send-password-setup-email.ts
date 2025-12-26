@@ -1,16 +1,17 @@
 import { Resend } from "resend";
+import { env } from "@/env";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = new Resend(env.RESEND_API_KEY);
 
 export async function sendPasswordSetupEmail(
   email: string,
   name: string,
   token: string
 ) {
-  const link = `${process.env.FRONT_URL}/primeiro-acesso?token=${token}`;
+  const link = `${env.FRONT_URL}/primeiro-acesso?token=${token}`;
 
   await resend.emails.send({
-    from: process.env.MAIL_FROM!,
+    from: env.MAIL_FROM,
     to: email,
     subject: "Defina sua senha de acesso",
     html: `

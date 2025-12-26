@@ -3,6 +3,7 @@ import { hash } from "bcrypt";
 
 import { prisma } from "@/database/prisma";
 import { AppError } from "@/utils/app-error";
+import { userSelect } from "@/utils/user-select";
 
 import {
   paramsSchema,
@@ -18,6 +19,7 @@ import {
 } from "@/utils/password-setup-token";
 import { sendPasswordSetupEmail } from "@/services/mail/send-password-setup-email";
 import { generateRandomPassword } from "@/utils/generate-random-password";
+import { deleteUserWithRelations } from "@/services/user-deletion-service";
 
 class UsersController {
   async create(request: Request, response: Response) {
@@ -168,7 +170,7 @@ class UsersController {
 
     const [users, total] = await prisma.$transaction([
       prisma.user.findMany({
-        include: { residents: true },
+        select: userSelect,
         orderBy: { createdAt: "desc" },
         where,
         take: limit,
@@ -274,7 +276,7 @@ class UsersController {
     const updated = await prisma.user.update({
       where: { id },
       data,
-      include: { residents: true },
+      select: userSelect,
     });
 
     return response.json(updated);
@@ -292,15 +294,7 @@ class UsersController {
       throw new AppError("User not found", 404);
     }
 
-    if (existing.residents) {
-      await prisma.residentInfo.delete({
-        where: { userId: id },
-      });
-    }
-
-    await prisma.user.delete({
-      where: { id },
-    });
+    await deleteUserWithRelations(id);
 
     return response.status(204).send();
   }

@@ -6,6 +6,7 @@ import { visitorsRoutes } from "./visitors-routes";
 import { eventsRoutes } from "./events-routes";
 import { areasRoutes } from "./areas-routes";
 import { reservationsRoutes } from "./reservations-routes";
+import { imagesRoutes } from "./images-routes";
 
 const routes = Router();
 
@@ -15,5 +16,6 @@ routes.use("/visitors", visitorsRoutes);
 routes.use("/events", eventsRoutes);
 routes.use("/areas", areasRoutes);
 routes.use("/reservations", reservationsRoutes);
+routes.use("/images", imagesRoutes);
 
 export { routes };
