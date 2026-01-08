@@ -13,9 +13,11 @@ import {
   minutesFromTime,
   normalizeDate,
 } from "@/utils/datetime";
+import { requireCondominiumId } from "@/utils/condominium";
 
 class ReservationsController {
   async create(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const { areaId, date, startSlotId, endSlotId, purpose } =
       createReservationSchema.parse(request.body);
 
@@ -26,7 +28,7 @@ class ReservationsController {
       const created = await prisma.$transaction(
         async (tx) => {
           const slots = await tx.areaTimeSlot.findMany({
-            where: { id: { in: [startSlotId, endSlotId] } },
+            where: { id: { in: [startSlotId, endSlotId] }, condominiumId },
           });
 
           const startSlot = slots.find((slot) => slot.id === startSlotId);
@@ -54,6 +56,7 @@ class ReservationsController {
             where: {
               areaId: areaId,
               date: reservationDate,
+              condominiumId,
               OR: [
                 {
                   startTime: { lt: new Date(endTime) },
@@ -78,6 +81,7 @@ class ReservationsController {
               startSlotId,
               endSlotId,
               purpose,
+              condominiumId,
             },
             include: {
               resident: {
@@ -110,6 +114,7 @@ class ReservationsController {
   }
 
   async list(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const { areaId, status, startDate, endDate } =
       reservationQuerySchema.parse(request.query);
 
@@ -137,6 +142,7 @@ class ReservationsController {
     }
 
     const where = {
+      condominiumId,
       ...(areaId ? { areaId } : {}),
       ...(status ? { status } : {}),
       ...(start || end
@@ -162,10 +168,11 @@ class ReservationsController {
   }
 
   async approve(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const { id } = actionSchema.parse(request.params);
 
-    const reservation = await prisma.areaReservation.findUnique({
-      where: { id },
+    const reservation = await prisma.areaReservation.findFirst({
+      where: { id, condominiumId },
     });
 
     if(!reservation) {
@@ -183,10 +190,11 @@ class ReservationsController {
   }
 
   async reject(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const { id } = actionSchema.parse(request.params);
 
-    const reservation = await prisma.areaReservation.findUnique({
-      where: { id },
+    const reservation = await prisma.areaReservation.findFirst({
+      where: { id, condominiumId },
     });
 
     if(!reservation) {
@@ -204,10 +212,11 @@ class ReservationsController {
   }
 
   async cancel(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const { id } = actionSchema.parse(request.params);
 
-    const reservation = await prisma.areaReservation.findUnique({
-      where: { id },
+    const reservation = await prisma.areaReservation.findFirst({
+      where: { id, condominiumId },
     });
 
     if(!reservation) {

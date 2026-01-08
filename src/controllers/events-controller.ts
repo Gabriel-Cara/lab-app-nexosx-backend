@@ -7,14 +7,25 @@ import {
   eventIdParamsSchema,
   eventUpdateSchema,
 } from "@/validators/event-schemas";
+import { requireCondominiumId } from "@/utils/condominium";
 import { Request, Response } from "express";
 
 class EventsController {
   async create(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const { description, allowBookings, ...eventData } = eventCreateSchema.parse(
       request.body
     );
     const userId = request.user!.id;
+
+    const area = await prisma.commonArea.findFirst({
+      where: { id: eventData.commonAreaId, condominiumId },
+      select: { id: true },
+    });
+
+    if (!area) {
+      throw new AppError("Area not found", 404);
+    }
 
     const event = await prisma.event.create({
       data: {
@@ -22,6 +33,7 @@ class EventsController {
         description: description ?? null,
         allowBookings: allowBookings ?? true,
         createdById: userId,
+        condominiumId,
       },
       include: {
         location: {
@@ -42,9 +54,11 @@ class EventsController {
   }
 
   async list(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const userId = request.user!.id;
 
     const events = await prisma.event.findMany({
+      where: { condominiumId },
       include: {
         location: { select: { id: true, name: true, capacity: true } },
         createdBy: { select: { name: true } },
@@ -61,13 +75,27 @@ class EventsController {
   }
 
   async update(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const { id } = eventIdParamsSchema.parse(request.params);
     const parsed = eventUpdateSchema.parse(request.body);
 
-    const existing = await prisma.event.findUnique({ where: { id } });
+    const existing = await prisma.event.findFirst({
+      where: { id, condominiumId },
+    });
 
     if (!existing) {
       throw new AppError("Event not found", 404);
+    }
+
+    if (parsed.commonAreaId) {
+      const area = await prisma.commonArea.findFirst({
+        where: { id: parsed.commonAreaId, condominiumId },
+        select: { id: true },
+      });
+
+      if (!area) {
+        throw new AppError("Area not found", 404);
+      }
     }
 
     const updateData = Object.fromEntries(
@@ -97,14 +125,15 @@ class EventsController {
   }
 
   async book(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const parsed = bookingCreateSchema.parse(request.body);
     const userId = request.user!.id;
 
     try {
       const booking = await prisma.$transaction(
         async (tx) => {
-          const event = await tx.event.findUnique({
-            where: { id: parsed.eventId },
+          const event = await tx.event.findFirst({
+            where: { id: parsed.eventId, condominiumId },
             select: {
               id: true,
               allowBookings: true,
@@ -120,12 +149,11 @@ class EventsController {
             throw new AppError("Event does not allow bookings", 400);
           }
 
-          const existingBooking = await tx.eventBooking.findUnique({
+          const existingBooking = await tx.eventBooking.findFirst({
             where: {
-              eventId_residentId: {
-                eventId: parsed.eventId,
-                residentId: userId,
-              },
+              eventId: parsed.eventId,
+              residentId: userId,
+              condominiumId,
             },
             select: { id: true },
           });
@@ -135,7 +163,7 @@ class EventsController {
           }
 
           const bookingsCount = await tx.eventBooking.count({
-            where: { eventId: parsed.eventId },
+            where: { eventId: parsed.eventId, condominiumId },
           });
 
           if (bookingsCount >= event.capacity) {
@@ -147,6 +175,7 @@ class EventsController {
               eventId: parsed.eventId,
               residentId: userId,
               notes: parsed.notes ?? null,
+              condominiumId,
             },
           });
         },
@@ -173,22 +202,20 @@ class EventsController {
   }
 
   async like(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const { id } = eventIdParamsSchema.parse(request.params);
     const userId = request.user!.id;
 
-    const event = await prisma.event.findUnique({ where: { id } });
+    const event = await prisma.event.findFirst({
+      where: { id, condominiumId },
+    });
 
     if (!event) {
       throw new AppError("Event not found", 404);
     }
 
-    const existing = await prisma.eventLike.findUnique({
-      where: {
-        eventId_userId: {
-          eventId: id,
-          userId,
-        },
-      },
+    const existing = await prisma.eventLike.findFirst({
+      where: { eventId: id, userId, condominiumId },
     });
 
     if (existing) {
@@ -199,6 +226,7 @@ class EventsController {
       data: {
         eventId: id,
         userId,
+        condominiumId,
       },
     });
 
@@ -206,10 +234,11 @@ class EventsController {
   }
 
   async bookings(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const { id } = eventIdParamsSchema.parse(request.params);
 
-    const event = await prisma.event.findUnique({
-      where: { id },
+    const event = await prisma.event.findFirst({
+      where: { id, condominiumId },
       select: { id: true },
     });
 
@@ -218,7 +247,7 @@ class EventsController {
     }
 
     const bookings = await prisma.eventBooking.findMany({
-      where: { eventId: id },
+      where: { eventId: id, condominiumId },
       select: {
         resident: {
           select: {
@@ -239,52 +268,48 @@ class EventsController {
   }
 
   async unlike(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const { id } = eventIdParamsSchema.parse(request.params);
     const userId = request.user!.id;
 
-    const event = await prisma.event.findUnique({ where: { id } });
+    const event = await prisma.event.findFirst({
+      where: { id, condominiumId },
+    });
 
     if (!event) {
       throw new AppError("Event not found", 404);
     }
 
-    const existing = await prisma.eventLike.findUnique({
-      where: {
-        eventId_userId: {
-          eventId: id,
-          userId,
-        },
-      },
+    const existing = await prisma.eventLike.findFirst({
+      where: { eventId: id, userId, condominiumId },
     });
 
     if (!existing) {
       return response.json({ liked: false });
     }
 
-    await prisma.eventLike.delete({
-      where: {
-        eventId_userId: {
-          eventId: id,
-          userId,
-        },
-      },
+    await prisma.eventLike.deleteMany({
+      where: { eventId: id, userId, condominiumId },
     });
 
     return response.json({ liked: false });
   }
 
   async delete(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const { id } = eventIdParamsSchema.parse(request.params);
 
-    const event = await prisma.event.findUnique({ where: { id } });
+    const event = await prisma.event.findFirst({
+      where: { id, condominiumId },
+    });
 
     if (!event) {
       throw new AppError("Event not found", 404);
     }
 
     await prisma.$transaction([
-      prisma.eventLike.deleteMany({ where: { eventId: id } }),
-      prisma.eventBooking.deleteMany({ where: { eventId: id } }),
+      prisma.eventLike.deleteMany({ where: { eventId: id, condominiumId } }),
+      prisma.eventBooking.deleteMany({ where: { eventId: id, condominiumId } }),
       prisma.event.delete({ where: { id } }),
     ]);
 

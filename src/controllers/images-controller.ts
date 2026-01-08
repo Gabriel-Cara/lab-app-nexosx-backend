@@ -3,6 +3,7 @@ import { Request, Response } from "express";
 import { prisma } from "@/database/prisma";
 import { AppError } from "@/utils/app-error";
 import { imageRemoveSchema, imageUploadSchema } from "@/validators/image-schemas";
+import { requireCondominiumId } from "@/utils/condominium";
 
 type AuthenticatedUser = NonNullable<Request["user"]>;
 
@@ -12,12 +13,14 @@ const visitRoles = new Set(["admin", "staff", "resident"]);
 class ImagesController {
   async upload(request: Request, response: Response) {
     const user = requireUser(request);
+    const condominiumId = requireCondominiumId(request);
     const { entityType, entityId, image } = imageUploadSchema.parse(request.body);
     const updated = await updateEntityImage({
       user,
       entityType,
       entityId,
       imageUrl: image,
+      condominiumId,
     });
 
     return response.json(updated);
@@ -25,12 +28,14 @@ class ImagesController {
 
   async remove(request: Request, response: Response) {
     const user = requireUser(request);
+    const condominiumId = requireCondominiumId(request);
     const { entityType, entityId } = imageRemoveSchema.parse(request.body);
     const updated = await updateEntityImage({
       user,
       entityType,
       entityId,
       imageUrl: null,
+      condominiumId,
     });
 
     return response.json(updated);
@@ -60,13 +65,14 @@ async function updateEntityImage(params: {
   entityType: ImageEntity;
   entityId: string;
   imageUrl: string | null;
+  condominiumId: string;
 }) {
-  const { user, entityType, entityId, imageUrl } = params;
+  const { user, entityType, entityId, imageUrl, condominiumId } = params;
 
   if (entityType === "package") {
     assertRole(user, staffRoles);
-    const pkg = await prisma.package.findUnique({
-      where: { id: entityId },
+    const pkg = await prisma.package.findFirst({
+      where: { id: entityId, condominiumId },
       select: { id: true },
     });
 
@@ -83,8 +89,8 @@ async function updateEntityImage(params: {
 
   if (entityType === "area") {
     assertRole(user, staffRoles);
-    const area = await prisma.commonArea.findUnique({
-      where: { id: entityId },
+    const area = await prisma.commonArea.findFirst({
+      where: { id: entityId, condominiumId },
       select: { id: true },
     });
 
@@ -101,8 +107,8 @@ async function updateEntityImage(params: {
 
   if (entityType === "event") {
     assertRole(user, staffRoles);
-    const event = await prisma.event.findUnique({
-      where: { id: entityId },
+    const event = await prisma.event.findFirst({
+      where: { id: entityId, condominiumId },
       select: { id: true },
     });
 
@@ -119,8 +125,8 @@ async function updateEntityImage(params: {
 
   if (entityType === "visit") {
     assertRole(user, visitRoles);
-    const log = await prisma.visitLog.findUnique({
-      where: { id: entityId },
+    const log = await prisma.visitLog.findFirst({
+      where: { id: entityId, condominiumId },
       select: { id: true, hostId: true },
     });
 
@@ -143,8 +149,8 @@ async function updateEntityImage(params: {
     throw new AppError("Unauthorized", 401);
   }
 
-  const existing = await prisma.user.findUnique({
-    where: { id: entityId },
+  const existing = await prisma.user.findFirst({
+    where: { id: entityId, condominiumId },
     select: { id: true },
   });
 

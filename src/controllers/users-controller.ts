@@ -20,9 +20,11 @@ import {
 import { sendPasswordSetupEmail } from "@/services/mail/send-password-setup-email";
 import { generateRandomPassword } from "@/utils/generate-random-password";
 import { deleteUserWithRelations } from "@/services/user-deletion-service";
+import { requireCondominiumId } from "@/utils/condominium";
 
 class UsersController {
   async create(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const {
       name,
       email,
@@ -35,7 +37,14 @@ class UsersController {
       emergencyContact,
     } = userCreateSchema.parse(request.body);
 
-    const existing = await prisma.user.findUnique({ where: { email } });
+    const existing = await prisma.user.findUnique({
+      where: {
+        condominiumId_email: {
+          condominiumId,
+          email,
+        },
+      },
+    });
 
     if (existing) {
       throw new AppError("User already exists", 400);
@@ -53,6 +62,7 @@ class UsersController {
         phone: phone ?? null,
         role,
         apartment: apartment ?? null,
+        condominiumId,
         password: hashedPassword,
         ...(role === "resident"
           ? {
@@ -61,6 +71,7 @@ class UsersController {
                   building,
                   vehicle: vehicle ?? null,
                   emergencyContact: emergencyContact ?? null,
+                  condominiumId,
                 },
               },
             }
@@ -104,10 +115,11 @@ class UsersController {
   }
 
   async resendInvite(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const userId = request.params.id;
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
+    const user = await prisma.user.findFirst({
+      where: { id: userId, condominiumId },
     });
 
     if (!user || user.role !== "resident") {
@@ -137,6 +149,7 @@ class UsersController {
   }
 
   async list(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const {
       name,
       apartment,
@@ -148,6 +161,7 @@ class UsersController {
     } = paramsSchema.parse(request.query);
 
     const where: Prisma.UserWhereInput = {
+      condominiumId,
       name: name ? { contains: name, mode: "insensitive" } : undefined,
       apartment: apartment
         ? { contains: apartment, mode: "insensitive" }
@@ -190,6 +204,7 @@ class UsersController {
   }
 
   async update(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const { id } = userIdParamsSchema.parse(request.params);
 
     const {
@@ -204,8 +219,8 @@ class UsersController {
       emergencyContact,
     } = userUpdateSchema.parse(request.body);
 
-    const existing = await prisma.user.findUnique({
-      where: { id },
+    const existing = await prisma.user.findFirst({
+      where: { id, condominiumId },
       include: { residents: true },
     });
 
@@ -214,8 +229,17 @@ class UsersController {
     }
 
     if (email && email !== existing.email) {
-      const emailInUse = await prisma.user.findUnique({ where: { email } });
-      if (emailInUse) {
+      const emailInUse = await prisma.user.findUnique({
+        where: {
+          condominiumId_email: {
+            condominiumId,
+            email,
+          },
+        },
+        select: { id: true },
+      });
+
+      if (emailInUse && emailInUse.id !== id) {
         throw new AppError("Email already in use", 400);
       }
     }
@@ -254,6 +278,7 @@ class UsersController {
               building: normalizedBuilding ?? null,
               vehicle: normalizedVehicle ?? null,
               emergencyContact: normalizedEmergencyContact ?? null,
+              condominiumId,
             },
             update: {
               ...(normalizedBuilding !== undefined
@@ -283,10 +308,11 @@ class UsersController {
   }
 
   async delete(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const { id } = userIdParamsSchema.parse(request.params);
 
-    const existing = await prisma.user.findUnique({
-      where: { id },
+    const existing = await prisma.user.findFirst({
+      where: { id, condominiumId },
       include: { residents: true },
     });
 
@@ -294,7 +320,7 @@ class UsersController {
       throw new AppError("User not found", 404);
     }
 
-    await deleteUserWithRelations(id);
+    await deleteUserWithRelations(id, condominiumId);
 
     return response.status(204).send();
   }

@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client"
+import { hash } from "bcrypt"
 
 const prisma = new PrismaClient()
 
@@ -46,6 +47,16 @@ const AREAS: AreaSeed[] = [
   },
 ]
 
+const MASTER_EMAIL = process.env.MASTER_EMAIL ?? "master@nexus.local"
+const MASTER_NAME = process.env.MASTER_NAME ?? "Master"
+const MASTER_PASSWORD = process.env.MASTER_PASSWORD ?? "ChangeMe123!"
+
+const DEFAULT_CONDOMINIUM_CODE = process.env.SEED_CONDOMINIUM_CODE ?? "demo"
+const DEFAULT_CONDOMINIUM_NAME = process.env.SEED_CONDOMINIUM_NAME ?? "Condomínio Demo"
+const SEED_ADMIN_NAME = process.env.SEED_ADMIN_NAME ?? "Admin Demo"
+const SEED_ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? "admin@nexus.local"
+const SEED_ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? "Admin123!"
+
 function toMinutes(time: string) {
   const [hours, minutes] = time.split(":").map(Number)
   return hours * 60 + minutes
@@ -84,10 +95,72 @@ function buildSlots(area: AreaSeed) {
   return slots
 }
 
+async function ensureMasterUser() {
+  const existing = await prisma.user.findFirst({
+    where: { role: "master" },
+  })
+
+  if (existing) {
+    return existing
+  }
+
+  const passwordHash = await hash(MASTER_PASSWORD, 8)
+
+  return prisma.user.create({
+    data: {
+      name: MASTER_NAME,
+      email: MASTER_EMAIL,
+      password: passwordHash,
+      role: "master",
+    },
+  })
+}
+
+async function ensureDemoAdmin(condominiumId: string) {
+  const existing = await prisma.user.findFirst({
+    where: { role: "admin", condominiumId },
+  })
+
+  if (existing) {
+    return existing
+  }
+
+  const passwordHash = await hash(SEED_ADMIN_PASSWORD, 8)
+
+  return prisma.user.create({
+    data: {
+      name: SEED_ADMIN_NAME,
+      email: SEED_ADMIN_EMAIL,
+      password: passwordHash,
+      role: "admin",
+      condominiumId,
+    },
+  })
+}
+
 async function main() {
-  await prisma.areaReservation.deleteMany()
-  await prisma.areaTimeSlot.deleteMany()
-  await prisma.commonArea.deleteMany()
+  await ensureMasterUser()
+
+  const condominium = await prisma.condominium.upsert({
+    where: { code: DEFAULT_CONDOMINIUM_CODE },
+    update: { name: DEFAULT_CONDOMINIUM_NAME },
+    create: {
+      name: DEFAULT_CONDOMINIUM_NAME,
+      code: DEFAULT_CONDOMINIUM_CODE,
+    },
+  })
+
+  await ensureDemoAdmin(condominium.id)
+
+  await prisma.areaReservation.deleteMany({
+    where: { condominiumId: condominium.id },
+  })
+  await prisma.areaTimeSlot.deleteMany({
+    where: { condominiumId: condominium.id },
+  })
+  await prisma.commonArea.deleteMany({
+    where: { condominiumId: condominium.id },
+  })
 
   for (const area of AREAS) {
     const createdArea = await prisma.commonArea.create({
@@ -96,6 +169,7 @@ async function main() {
         description: area.description,
         capacity: area.capacity,
         available: area.available ?? true,
+        condominiumId: condominium.id,
       },
     })
 
@@ -106,6 +180,7 @@ async function main() {
         data: slots.map((slot) => ({
           ...slot,
           areaId: createdArea.id,
+          condominiumId: condominium.id,
         })),
       })
     }

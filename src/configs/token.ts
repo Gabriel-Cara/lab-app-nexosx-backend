@@ -4,6 +4,7 @@ import { env } from "@/env";
 export interface JwtPayload {
   sub: string;
   role: string;
+  condominiumId?: string | null;
 }
 
 export const signToken = (payload: JwtPayload) => {

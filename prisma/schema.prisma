@@ -8,6 +8,7 @@ datasource db {
 }
 
 enum Role {
+  master
   admin
   staff
   resident
@@ -42,14 +43,67 @@ enum PackageType {
   others
 }
 
+enum CondominiumRequestStatus {
+  pending
+  approved
+  rejected
+}
+
+model Condominium {
+  id        String   @id @default(uuid())
+  name      String
+  code      String   @unique
+  createdAt DateTime @default(now()) @map("created-at")
+  updatedAt DateTime @updatedAt @map("updated-at")
+
+  users            User[]
+  residentInfos    ResidentInfo[]
+  visitors         Visitor[]
+  visitLogs        VisitLog[]
+  packages         Package[]
+  retrievalLogs    RetrievalLog[]
+  events           Event[]
+  eventBookings    EventBooking[]
+  eventLikes       EventLike[]
+  commonAreas      CommonArea[]
+  areaReservations AreaReservation[]
+  areaTimeSlots    AreaTimeSlot[]
+  requests         CondominiumRequest[]
+
+  @@map("condominiums")
+}
+
+model CondominiumRequest {
+  id                String   @id @default(uuid())
+  name              String
+  code              String
+  adminName         String   @map("admin-name")
+  adminEmail        String   @map("admin-email")
+  adminPhone        String?  @map("admin-phone")
+  adminPasswordHash String   @map("admin-password-hash")
+  status            CondominiumRequestStatus @default(pending)
+  createdAt         DateTime @default(now()) @map("created-at")
+  decidedAt         DateTime? @map("decided-at")
+  rejectionReason   String?  @map("rejection-reason")
+  decisionById      String?  @map("decision-by-id")
+  decisionBy        User?    @relation("condominium-request-decided-by", fields: [decisionById], references: [id])
+  condominiumId     String?  @map("condominium-id")
+  condominium       Condominium? @relation(fields: [condominiumId], references: [id])
+
+  @@unique([code])
+  @@map("condominium-requests")
+}
+
 model User {
   id                 String            @id @default(uuid())
   name               String
-  email              String            @unique
+  email              String
   phone              String?
   imageUrl           String?           @map("image-url")
   password           String
   role               Role              @default(resident)
+  condominiumId      String?           @map("condominium-id")
+  condominium        Condominium?      @relation(fields: [condominiumId], references: [id])
   apartment          String?
   createdAt          DateTime          @default(now()) @map("created-at")
   updatedAt          DateTime          @updatedAt @map("updated-at")
@@ -62,10 +116,12 @@ model User {
   createdEvents      Event[]           @relation("event-created-by")
   eventBookings      EventBooking[]
   AreaReservation    AreaReservation[]
+  decidedRequests    CondominiumRequest[] @relation("condominium-request-decided-by")
 
   passwordSetupToken PasswordSetupToken?
   eventLikes         EventLike[]
 
+  @@unique([condominiumId, email])
   @@map("users")
 }
 
@@ -88,6 +144,8 @@ model ResidentInfo {
   id               String  @id @default(uuid())
   user             User    @relation(fields: [userId], references: [id])
   userId           String  @unique @map("user-id")
+  condominiumId    String  @map("condominium-id")
+  condominium      Condominium @relation(fields: [condominiumId], references: [id])
   building         String?
   vehicle          String?
   emergencyContact String? @map("emergency-contact")
@@ -98,14 +156,17 @@ model ResidentInfo {
 model Visitor {
   id          String        @id @default(uuid())
   name        String
-  document    String        @unique
+  document    String
   phone       String?
   visitReason String?       @map("visit-reason")
   status      VisitorStatus @default(pending)
+  condominiumId String      @map("condominium-id")
+  condominium   Condominium @relation(fields: [condominiumId], references: [id])
   createdAt   DateTime      @default(now()) @map("created-at")
   updatedAt   DateTime      @updatedAt @map("updated-at")
   logs        VisitLog[]
 
+  @@unique([condominiumId, document])
   @@map("visitors")
 }
 
@@ -122,6 +183,8 @@ model VisitLog {
   handledById String?
   status      VisitorStatus @default(pending)
   imageUrl    String?       @map("image-url")
+  condominiumId String      @map("condominium-id")
+  condominium   Condominium @relation(fields: [condominiumId], references: [id])
   createdAt   DateTime      @default(now()) @map("created-at")
 
   @@map("visit-logs")
@@ -138,6 +201,8 @@ model Package {
   type          PackageType
   status        PackageStatus  @default(pending)
   imageUrl      String?        @map("image-url")
+  condominiumId String         @map("condominium-id")
+  condominium   Condominium    @relation(fields: [condominiumId], references: [id])
   receivedAt    DateTime       @default(now()) @map("received-at")
   retrievedAt   DateTime?      @map("retrieved-at")
   deliveredAt   DateTime?      @map("delivered-at")
@@ -158,6 +223,8 @@ model RetrievalLog {
   verifiedById String
   verifiedAt   DateTime @default(now()) @map("verified-at")
   method       String
+  condominiumId String   @map("condominium-id")
+  condominium   Condominium @relation(fields: [condominiumId], references: [id])
 
   @@map("retrieval-logs")
 }
@@ -173,6 +240,8 @@ model Event {
   capacity    Int
   allowBookings Boolean       @default(true) @map("allow-bookings")
   imageUrl    String?         @map("image-url")
+  condominiumId String         @map("condominium-id")
+  condominium   Condominium    @relation(fields: [condominiumId], references: [id])
   startDate   DateTime       @map("start-date")
   endDate     DateTime       @map("end-date")
   createdBy   User           @relation("event-created-by", fields: [createdById], references: [id])
@@ -190,6 +259,8 @@ model EventBooking {
   resident   User     @relation(fields: [residentId], references: [id])
   residentId String   @map("resident-id")
   notes      String?
+  condominiumId String   @map("condominium-id")
+  condominium   Condominium @relation(fields: [condominiumId], references: [id])
   createdAt  DateTime @default(now()) @map("created-at")
 
   @@unique([eventId, residentId])
@@ -202,6 +273,8 @@ model EventLike {
   eventId   String   @map("event-id")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String   @map("user-id")
+  condominiumId String   @map("condominium-id")
+  condominium   Condominium @relation(fields: [condominiumId], references: [id])
   createdAt DateTime @default(now()) @map("created-at")
 
   @@unique([eventId, userId])
@@ -215,6 +288,8 @@ model CommonArea {
   capacity    Int?
   available   Boolean  @default(true)
   imageUrl    String?  @map("image-url")
+  condominiumId String  @map("condominium-id")
+  condominium   Condominium @relation(fields: [condominiumId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -222,6 +297,7 @@ model CommonArea {
   Event        Event[]
   timeSlots    AreaTimeSlot[]
 
+  @@unique([condominiumId, name])
   @@map("areas")
 }
 
@@ -233,6 +309,8 @@ model AreaReservation {
   purpose   String?
   status    ReservationStatus @default(pending)
   createdAt DateTime          @default(now())
+  condominiumId String         @map("condominium-id")
+  condominium   Condominium    @relation(fields: [condominiumId], references: [id])
 
   areaId String
   area   CommonArea @relation(fields: [areaId], references: [id], onDelete: Cascade)
@@ -259,6 +337,8 @@ model AreaTimeSlot {
   sortOrder         Int?              @map("sort-order")
   areaId            String            @map("area-id")
   area              CommonArea        @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  condominiumId     String            @map("condominium-id")
+  condominium       Condominium       @relation(fields: [condominiumId], references: [id])
   startReservations AreaReservation[] @relation("ReservationStartSlot")
   endReservations   AreaReservation[] @relation("ReservationEndSlot")
 

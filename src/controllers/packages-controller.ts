@@ -5,6 +5,7 @@ import { generateCode } from "@/utils/generate-code";
 import { PackageType, Prisma } from "@prisma/client";
 import bcrypt from "bcrypt";
 import { env } from "@/env";
+import { requireCondominiumId } from "@/utils/condominium";
 import {
   packageCreateSchema,
   packageParamsSchema,
@@ -15,8 +16,18 @@ import { Request, Response } from "express";
 
 class PackagesController {
   async create(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const { residentId, description, carrier, type } =
       packageCreateSchema.parse(request.body);
+
+    const resident = await prisma.user.findFirst({
+      where: { id: residentId, condominiumId, role: "resident" },
+      select: { id: true },
+    });
+
+    if (!resident) {
+      throw new AppError("Resident not found", 404);
+    }
 
     const code = generateCode(6);
     const codeHash = await bcrypt.hash(code, 10);
@@ -35,6 +46,7 @@ class PackagesController {
         type,
         status: "pending",
         createdById: request.user!.id,
+        condominiumId,
       },
       select: {
         id: true,
@@ -65,12 +77,16 @@ class PackagesController {
   }
 
   async list(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const { role, id } = request.user!;
 
-    const where = role === "resident" ? { residentId: id } : undefined;
+    const where =
+      role === "resident"
+        ? { residentId: id, condominiumId }
+        : { condominiumId };
 
     const packages = await prisma.package.findMany({
-      ...(where ? { where } : {}),
+      where,
       select: {
         id: true,
         description: true,
@@ -95,14 +111,28 @@ class PackagesController {
   }
 
   async update(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const { id } = packageParamsSchema.parse(request.params);
     const { residentId, description, carrier, type } =
       packageUpdateSchema.parse(request.body);
 
-    const pkg = await prisma.package.findUnique({ where: { id } });
+    const pkg = await prisma.package.findFirst({
+      where: { id, condominiumId },
+    });
 
     if (!pkg) {
       throw new AppError("Package not found", 404);
+    }
+
+    if (residentId !== undefined) {
+      const resident = await prisma.user.findFirst({
+        where: { id: residentId, condominiumId, role: "resident" },
+        select: { id: true },
+      });
+
+      if (!resident) {
+        throw new AppError("Resident not found", 404);
+      }
     }
 
     const data: {
@@ -147,6 +177,7 @@ class PackagesController {
   }
 
   async retrieve(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const { id } = packageParamsSchema.parse(request.params);
 
     if (!id) {
@@ -160,8 +191,8 @@ class PackagesController {
     try {
       const updated = await prisma.$transaction(
         async (tx) => {
-          const pkg = await tx.package.findUnique({
-            where: { id },
+          const pkg = await tx.package.findFirst({
+            where: { id, condominiumId },
             select: {
               id: true,
               status: true,
@@ -199,6 +230,7 @@ class PackagesController {
           const updateResult = await tx.package.updateMany({
             where: {
               id,
+              condominiumId,
               status: { not: "retrieved" },
             },
             data: {
@@ -217,11 +249,12 @@ class PackagesController {
               packageId: id,
               verifiedById: userId,
               method: "codigo",
+              condominiumId,
             },
           });
 
-          return tx.package.findUnique({
-            where: { id },
+          return tx.package.findFirst({
+            where: { id, condominiumId },
             select: {
               id: true,
               description: true,
@@ -263,13 +296,16 @@ class PackagesController {
   }
 
   async cancel(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const { id } = packageParamsSchema.parse(request.params);
 
     if (!id) {
       throw new AppError("Must provide id", 400);
     }
 
-    const pkg = await prisma.package.findUnique({ where: { id } });
+    const pkg = await prisma.package.findFirst({
+      where: { id, condominiumId },
+    });
 
     if (!pkg) {
       throw new AppError("Package not found", 404);
@@ -301,16 +337,21 @@ class PackagesController {
   }
 
   async delete(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const { id } = packageParamsSchema.parse(request.params);
 
-    const pkg = await prisma.package.findUnique({ where: { id } });
+    const pkg = await prisma.package.findFirst({
+      where: { id, condominiumId },
+    });
 
     if (!pkg) {
       throw new AppError("Package not found", 404);
     }
 
     await prisma.$transaction([
-      prisma.retrievalLog.deleteMany({ where: { packageId: id } }),
+      prisma.retrievalLog.deleteMany({
+        where: { packageId: id, condominiumId },
+      }),
       prisma.package.delete({ where: { id } }),
     ]);
 

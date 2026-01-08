@@ -1,0 +1,30 @@
+import { Router } from "express";
+
+import { CondominiumRequestsController } from "@/controllers/condominium-requests-controller";
+import { authenticate, authorize } from "@/middlewares/auth-middlewares";
+
+const condominiumRequestsRoutes = Router();
+const condominiumRequestsController = new CondominiumRequestsController();
+
+condominiumRequestsRoutes.post("/", condominiumRequestsController.create);
+
+condominiumRequestsRoutes.get(
+  "/",
+  authenticate,
+  authorize(["master"]),
+  condominiumRequestsController.list
+);
+condominiumRequestsRoutes.patch(
+  "/:id/approve",
+  authenticate,
+  authorize(["master"]),
+  condominiumRequestsController.approve
+);
+condominiumRequestsRoutes.patch(
+  "/:id/reject",
+  authenticate,
+  authorize(["master"]),
+  condominiumRequestsController.reject
+);
+
+export { condominiumRequestsRoutes };

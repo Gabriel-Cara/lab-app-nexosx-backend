@@ -2,6 +2,7 @@ import { prisma } from "@/database/prisma";
 import { AppError } from "@/utils/app-error";
 import { buildSlotsFromSchedule } from "@/utils/area-slots";
 import { combineDateWithTime, normalizeDate } from "@/utils/datetime";
+import { requireCondominiumId } from "@/utils/condominium";
 import {
   areaParamsSchema,
   areaSlotsQuerySchema,
@@ -13,10 +14,11 @@ import { Request, Response } from "express";
 
 class AreasController {
   async index(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const { id } = areaParamsSchema.parse(request.params);
 
-    const areas = await prisma.commonArea.findUnique({
-      where: { id },
+    const areas = await prisma.commonArea.findFirst({
+      where: { id, condominiumId },
       include: {
         timeSlots: {
           where: { isActive: true },
@@ -35,9 +37,12 @@ class AreasController {
   }
 
   async create(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const { name, schedule, ...data } = createAreaSchema.parse(request.body);
 
-    const existing = await prisma.commonArea.findFirst({ where: { name } });
+    const existing = await prisma.commonArea.findFirst({
+      where: { name, condominiumId },
+    });
 
     if (existing) {
       throw new AppError("Area already exists", 400);
@@ -48,6 +53,7 @@ class AreasController {
         data: {
           name,
           ...data,
+          condominiumId,
         },
       });
 
@@ -59,6 +65,7 @@ class AreasController {
             data: slots.map((slot) => ({
               ...slot,
               areaId: createdArea.id,
+              condominiumId,
             })),
           });
         }
@@ -70,8 +77,10 @@ class AreasController {
     return response.status(201).json(area);
   }
 
-  async list(_: Request, response: Response) {
+  async list(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const areas = await prisma.commonArea.findMany({
+      where: { condominiumId },
       orderBy: { name: "asc" },
       include: {
         timeSlots: {
@@ -91,10 +100,13 @@ class AreasController {
   }
 
   async update(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const { id } = areaParamsSchema.parse(request.params);
     const { schedule, ...data } = updateAreaSchema.parse(request.body);
 
-    const area = await prisma.commonArea.findUnique({ where: { id } });
+    const area = await prisma.commonArea.findFirst({
+      where: { id, condominiumId },
+    });
 
     if (!area) {
       throw new AppError("Area not found", 404);
@@ -118,7 +130,7 @@ class AreasController {
         const slots = buildSlotsFromSchedule(schedule);
 
         await tx.areaTimeSlot.updateMany({
-          where: { areaId: id },
+          where: { areaId: id, condominiumId },
           data: { isActive: false },
         });
 
@@ -140,6 +152,7 @@ class AreasController {
               ...slot,
               areaId: id,
               isActive: true,
+              condominiumId,
             },
           });
         }
@@ -152,24 +165,33 @@ class AreasController {
   }
 
   async delete(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const { id } = areaParamsSchema.parse(request.params);
 
-    const area = await prisma.commonArea.findUnique({ where: { id } });
+    const area = await prisma.commonArea.findFirst({
+      where: { id, condominiumId },
+    });
 
     if (!area) {
       throw new AppError("Area not found", 404);
     }
 
     const events = await prisma.event.findMany({
-      where: { commonAreaId: id },
+      where: { commonAreaId: id, condominiumId },
       select: { id: true },
     });
     const eventIds = events.map((event) => event.id);
 
     await prisma.$transaction([
-      prisma.eventLike.deleteMany({ where: { eventId: { in: eventIds } } }),
-      prisma.eventBooking.deleteMany({ where: { eventId: { in: eventIds } } }),
-      prisma.event.deleteMany({ where: { id: { in: eventIds } } }),
+      prisma.eventLike.deleteMany({
+        where: { eventId: { in: eventIds }, condominiumId },
+      }),
+      prisma.eventBooking.deleteMany({
+        where: { eventId: { in: eventIds }, condominiumId },
+      }),
+      prisma.event.deleteMany({
+        where: { id: { in: eventIds }, condominiumId },
+      }),
       prisma.commonArea.delete({ where: { id } }),
     ]);
 
@@ -177,6 +199,7 @@ class AreasController {
   }
 
   async slotsRange(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const { id } = areaParamsSchema.parse(request.params);
     const { start, end } = areaSlotsRangeQuerySchema.parse(request.query);
 
@@ -192,8 +215,8 @@ class AreasController {
         (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
       ) + 1;
 
-    const area = await prisma.commonArea.findUnique({
-      where: { id },
+    const area = await prisma.commonArea.findFirst({
+      where: { id, condominiumId },
       include: {
         timeSlots: {
           where: { isActive: true },
@@ -212,6 +235,7 @@ class AreasController {
     const reservations = await prisma.areaReservation.findMany({
       where: {
         areaId: id,
+        condominiumId,
         date: {
           gte: startDate,
           lt: rangeEnd,
@@ -287,6 +311,7 @@ class AreasController {
   }
 
   async slots(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
     const { id } = areaParamsSchema.parse(request.params);
     const { date } = areaSlotsQuerySchema.parse(request.query);
 
@@ -294,8 +319,8 @@ class AreasController {
     const nextDay = new Date(targetDate);
     nextDay.setDate(nextDay.getDate() + 1);
 
-    const area = await prisma.commonArea.findUnique({
-      where: { id },
+    const area = await prisma.commonArea.findFirst({
+      where: { id, condominiumId },
       include: {
         timeSlots: {
           where: { isActive: true },
@@ -311,6 +336,7 @@ class AreasController {
     const reservations = await prisma.areaReservation.findMany({
       where: {
         areaId: id,
+        condominiumId,
         date: {
           gte: targetDate,
           lt: nextDay,

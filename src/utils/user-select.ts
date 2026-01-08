@@ -7,6 +7,7 @@ export const userSelect = {
   phone: true,
   imageUrl: true,
   role: true,
+  condominiumId: true,
   apartment: true,
   createdAt: true,
   updatedAt: true,

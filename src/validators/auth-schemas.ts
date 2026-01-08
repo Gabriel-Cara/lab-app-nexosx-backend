@@ -15,7 +15,7 @@ const phoneSchema = z.string().transform((value, ctx) => {
   return normalized;
 });
 
-const optionalPhoneSchema = z.preprocess(
+export const optionalPhoneSchema = z.preprocess(
   (value) =>
     typeof value === "string" && value.trim().length === 0 ? undefined : value,
   phoneSchema.optional()

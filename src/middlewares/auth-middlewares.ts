@@ -24,7 +24,8 @@ const authenticate = (
 
     request.user = {
       id: payload.sub,
-      role: payload.role
+      role: payload.role,
+      condominiumId: payload.condominiumId ?? null,
     };
 
     return next();
