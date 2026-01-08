@@ -1,2 +1,2 @@
 -- DropIndex
-DROP INDEX "public"."condominium-requests_status_idx";
+DROP INDEX IF EXISTS "public"."condominium-requests_status_idx";
