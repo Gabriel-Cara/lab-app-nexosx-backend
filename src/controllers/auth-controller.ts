@@ -4,10 +4,18 @@ import { compare, hash } from "bcrypt";
 import { AppError } from "@/utils/app-error";
 import { prisma } from "@/database/prisma";
 
-import { loginSchema, setupPasswordSchema, userIdParamsSchema } from "@/validators/auth-schemas";
+import {
+  forgotPasswordSchema,
+  loginSchema,
+  resetPasswordSchema,
+  setupPasswordSchema,
+  userIdParamsSchema,
+} from "@/validators/auth-schemas";
 import { signToken } from "@/configs/token";
-import { hashSetupToken } from "@/utils/password-setup-token";
+import { generateSetupToken, hashSetupToken } from "@/utils/password-setup-token";
 import { userSelect } from "@/utils/user-select";
+import { sendAccountConfirmationEmail } from "@/services/mail/send-account-confirmation-email";
+import { sendPasswordResetEmail } from "@/services/mail/send-password-reset-email";
 
 class AuthController {
   async login(request: Request, response: Response) {
@@ -143,6 +151,22 @@ class AuthController {
 
     const record = await prisma.passwordSetupToken.findUnique({
       where: { tokenHash },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            condominium: {
+              select: {
+                name: true,
+                code: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!record) {
@@ -170,7 +194,101 @@ class AuthController {
       }),
     ]);
 
+    if (record.user?.role === "staff") {
+      await sendAccountConfirmationEmail({
+        email: record.user.email,
+        name: record.user.name,
+        condominiumName: record.user.condominium?.name,
+        condominiumCode: record.user.condominium?.code,
+      });
+    }
+
     return response.json({ message: "Password set successfully" });
+  }
+
+  async forgotPassword(request: Request, response: Response) {
+    const { email } = forgotPasswordSchema.parse(request.body);
+
+    const users = await prisma.user.findMany({
+      where: { email },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        condominium: {
+          select: { name: true, code: true },
+        },
+      },
+    });
+
+    if (users.length === 0) {
+      return response.json({
+        message: "If an account exists, a reset email was sent.",
+      });
+    }
+
+    for (const user of users) {
+      const token = generateSetupToken();
+      const tokenHash = hashSetupToken(token);
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+      await prisma.passwordResetToken.create({
+        data: {
+          userId: user.id,
+          tokenHash,
+          expiresAt,
+        },
+      });
+
+      await sendPasswordResetEmail({
+        email: user.email,
+        name: user.name,
+        token,
+        condominiumName: user.condominium?.name,
+        condominiumCode: user.condominium?.code,
+      });
+    }
+
+    return response.json({
+      message: "If an account exists, a reset email was sent.",
+    });
+  }
+
+  async resetPassword(request: Request, response: Response) {
+    const { token, password } = resetPasswordSchema.parse(request.body);
+
+    const tokenHash = hashSetupToken(token);
+
+    const record = await prisma.passwordResetToken.findUnique({
+      where: { tokenHash },
+    });
+
+    if (!record) {
+      throw new AppError("Invalid token", 400);
+    }
+
+    if (record.usedAt) {
+      throw new AppError("Token already used", 400);
+    }
+
+    if (record.expiresAt.getTime() < Date.now()) {
+      throw new AppError("Token expired", 400);
+    }
+
+    const newHashed = await hash(password, 8);
+
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: record.userId },
+        data: { password: newHashed },
+      }),
+      prisma.passwordResetToken.update({
+        where: { id: record.id },
+        data: { usedAt: new Date() },
+      }),
+    ]);
+
+    return response.json({ message: "Password reset successfully" });
   }
 }
 

@@ -32,6 +32,7 @@ export const userCreateSchema = z.object({
   phone: optionalPhoneSchema,
   role: z.enum(["admin", "staff", "resident"]),
   apartment: z.string().optional(),
+  shift: z.string().optional(),
   password: z.string().min(6).optional(),
   building: z.string().optional(),
   vehicle: z.string().optional(),
@@ -44,6 +45,7 @@ export const userUpdateSchema = z.object({
   phone: optionalPhoneSchema,
   role: z.enum(["admin", "staff", "resident"]).optional(),
   apartment: z.string().optional(),
+  shift: z.string().optional(),
   password: z.string().min(6).optional(),
   building: z.string().optional(),
   vehicle: z.string().optional(),
@@ -71,6 +73,15 @@ export const paramsSchema = z.object({
 });
 
 export const setupPasswordSchema = z.object({
+  token: z.string().min(20),
+  password: z.string().min(8, "Password must be at least 8 characters long"),
+});
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().email(),
+});
+
+export const resetPasswordSchema = z.object({
   token: z.string().min(20),
   password: z.string().min(8, "Password must be at least 8 characters long"),
 });

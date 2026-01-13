@@ -8,6 +8,11 @@ import {
   condominiumRequestIdSchema,
   condominiumRequestRejectSchema,
 } from "@/validators/condominium-request-schemas";
+import {
+  sendCondominiumRequestApprovedEmail,
+  sendCondominiumRequestRejectedEmail,
+  sendCondominiumRequestSubmittedEmail,
+} from "@/services/mail/send-condominium-request-email";
 
 class CondominiumRequestsController {
   async create(request: Request, response: Response) {
@@ -49,6 +54,13 @@ class CondominiumRequestsController {
         status: true,
         createdAt: true,
       },
+    });
+
+    await sendCondominiumRequestSubmittedEmail({
+      email: parsed.adminEmail,
+      name: parsed.adminName,
+      condominiumName: parsed.name,
+      condominiumCode: parsed.code,
     });
 
     return response.status(201).json(created);
@@ -139,6 +151,13 @@ class CondominiumRequestsController {
       return { condominium, adminUser, updatedRequest };
     });
 
+    await sendCondominiumRequestApprovedEmail({
+      email: requestRecord.adminEmail,
+      name: requestRecord.adminName,
+      condominiumName: requestRecord.name,
+      condominiumCode: requestRecord.code,
+    });
+
     return response.json({
       condominium: {
         id: result.condominium.id,
@@ -161,7 +180,14 @@ class CondominiumRequestsController {
 
     const requestRecord = await prisma.condominiumRequest.findUnique({
       where: { id },
-      select: { status: true },
+      select: {
+        status: true,
+        name: true,
+        code: true,
+        adminName: true,
+        adminEmail: true,
+        rejectionReason: true,
+      },
     });
 
     if (!requestRecord) {
@@ -185,6 +211,14 @@ class CondominiumRequestsController {
         status: true,
         decidedAt: true,
       },
+    });
+
+    await sendCondominiumRequestRejectedEmail({
+      email: requestRecord.adminEmail,
+      name: requestRecord.adminName,
+      condominiumName: requestRecord.name,
+      condominiumCode: requestRecord.code,
+      reason: reason ?? requestRecord.rejectionReason,
     });
 
     return response.json(updated);

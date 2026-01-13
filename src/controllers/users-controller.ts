@@ -31,11 +31,13 @@ class UsersController {
       phone,
       role,
       apartment,
+      shift,
       password,
       building,
       vehicle,
       emergencyContact,
     } = userCreateSchema.parse(request.body);
+    const normalizedShift = shift?.trim();
 
     const existing = await prisma.user.findUnique({
       where: {
@@ -62,6 +64,7 @@ class UsersController {
         phone: phone ?? null,
         role,
         apartment: apartment ?? null,
+        shift: normalizedShift || null,
         condominiumId,
         password: hashedPassword,
         ...(role === "resident"
@@ -79,9 +82,9 @@ class UsersController {
       },
     });
 
-    // Invite flow: if staff created a resident without specifying a password,
-    // send an email with a one-time token so the resident can set their own password.
-    if (role === "resident" && !password) {
+    // Invite flow: if staff created a resident/staff without specifying a password,
+    // send an email with a one-time token so the user can set their own password.
+    if ((role === "resident" || role === "staff") && !password) {
       const token = generateSetupToken();
       const tokenHash = hashSetupToken(token);
 
@@ -122,8 +125,8 @@ class UsersController {
       where: { id: userId, condominiumId },
     });
 
-    if (!user || user.role !== "resident") {
-      return response.status(404).json({ message: "Morador não encontrado" });
+    if (!user || (user.role !== "resident" && user.role !== "staff")) {
+      return response.status(404).json({ message: "Usuário não encontrado" });
     }
 
     const token = generateSetupToken();
@@ -213,6 +216,7 @@ class UsersController {
       phone,
       role,
       apartment,
+      shift,
       password,
       building,
       vehicle,
@@ -251,6 +255,7 @@ class UsersController {
     if (phone !== undefined) data.phone = phone;
     if (role !== undefined) data.role = role;
     if (apartment !== undefined) data.apartment = apartment ?? null;
+    if (shift !== undefined) data.shift = shift?.trim() || null;
 
     if (password) {
       data.password = await hash(password, 8);

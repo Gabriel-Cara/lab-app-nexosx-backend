@@ -9,6 +9,7 @@ export const userSelect = {
   role: true,
   condominiumId: true,
   apartment: true,
+  shift: true,
   createdAt: true,
   updatedAt: true,
   residents: {
