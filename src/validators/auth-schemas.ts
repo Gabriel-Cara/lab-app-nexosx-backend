@@ -21,6 +21,14 @@ export const optionalPhoneSchema = z.preprocess(
   phoneSchema.optional()
 );
 
+const residentVehicleSchema = z.object({
+  model: z.string().min(1),
+  plate: z.string().min(1),
+  year: z.coerce.number().int(),
+});
+
+const vehiclesSchema = z.array(residentVehicleSchema).optional();
+
 export const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8, "Password must be at least 8 characters long"),
@@ -35,7 +43,7 @@ export const userCreateSchema = z.object({
   shift: z.string().optional(),
   password: z.string().min(6).optional(),
   building: z.string().optional(),
-  vehicle: z.string().optional(),
+  vehicles: vehiclesSchema,
   emergencyContact: z.string().optional(),
 });
 
@@ -48,13 +56,13 @@ export const userUpdateSchema = z.object({
   shift: z.string().optional(),
   password: z.string().min(6).optional(),
   building: z.string().optional(),
-  vehicle: z.string().optional(),
+  vehicles: vehiclesSchema,
   emergencyContact: z.string().optional(),
 });
 
 export const updateProfileSchema = z.object({
   phone: optionalPhoneSchema,
-  vehicle: z.string().optional(),
+  vehicles: vehiclesSchema,
   emergencyContact: z.string().optional(),
 });
 

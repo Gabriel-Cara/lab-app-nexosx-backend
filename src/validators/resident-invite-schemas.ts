@@ -14,6 +14,14 @@ const optionalTextSchema = z.preprocess(
   z.string().optional()
 );
 
+const residentVehicleSchema = z.object({
+  model: z.string().min(1),
+  plate: z.string().min(1),
+  year: z.coerce.number().int(),
+});
+
+const vehiclesSchema = z.array(residentVehicleSchema).optional();
+
 export const residentInviteCreateSchema = z.object({});
 
 export const residentInviteTokenSchema = z.object({
@@ -27,7 +35,7 @@ export const residentSignupSchema = z.object({
   phone: optionalPhoneSchema,
   apartment: z.string().min(1),
   building: optionalTextSchema,
-  vehicle: optionalTextSchema,
+  vehicles: vehiclesSchema,
   emergencyContact: optionalTextSchema,
   password: optionalPasswordSchema,
 });

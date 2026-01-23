@@ -17,8 +17,15 @@ export const userSelect = {
       id: true,
       userId: true,
       building: true,
-      vehicle: true,
       emergencyContact: true,
+      vehicles: {
+        select: {
+          id: true,
+          model: true,
+          plate: true,
+          year: true,
+        },
+      },
     },
   },
 } satisfies Prisma.UserSelect;

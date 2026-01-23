@@ -78,7 +78,18 @@ const swaggerDocument = {
           apartment: { type: "string", nullable: true },
           password: { type: "string", minLength: 6, nullable: true },
           building: { type: "string", nullable: true },
-          vehicle: { type: "string", nullable: true },
+          vehicles: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["model", "plate", "year"],
+              properties: {
+                model: { type: "string" },
+                plate: { type: "string" },
+                year: { type: "integer" },
+              },
+            },
+          },
           emergencyContact: { type: "string", nullable: true },
         },
       },

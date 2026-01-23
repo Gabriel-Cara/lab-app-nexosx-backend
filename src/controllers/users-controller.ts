@@ -34,10 +34,15 @@ class UsersController {
       shift,
       password,
       building,
-      vehicle,
+      vehicles,
       emergencyContact,
     } = userCreateSchema.parse(request.body);
     const normalizedShift = shift?.trim();
+    const normalizedVehicles = vehicles?.map((vehicle) => ({
+      model: vehicle.model.trim(),
+      plate: vehicle.plate.trim(),
+      year: vehicle.year,
+    }));
 
     const existing = await prisma.user.findUnique({
       where: {
@@ -72,7 +77,9 @@ class UsersController {
               residents: {
                 create: {
                   building,
-                  vehicle: vehicle ?? null,
+                  vehicles: normalizedVehicles?.length
+                    ? { create: normalizedVehicles }
+                    : undefined,
                   emergencyContact: emergencyContact ?? null,
                   condominiumId,
                 },
@@ -219,7 +226,7 @@ class UsersController {
       shift,
       password,
       building,
-      vehicle,
+      vehicles,
       emergencyContact,
     } = userUpdateSchema.parse(request.body);
 
@@ -265,15 +272,21 @@ class UsersController {
 
     const normalizedBuilding =
       building !== undefined ? building || null : undefined;
-    const normalizedVehicle =
-      vehicle !== undefined ? vehicle || null : undefined;
+    const normalizedVehicles =
+      vehicles !== undefined
+        ? vehicles.map((vehicle) => ({
+            model: vehicle.model.trim(),
+            plate: vehicle.plate.trim(),
+            year: vehicle.year,
+          }))
+        : undefined;
     const normalizedEmergencyContact =
       emergencyContact !== undefined ? emergencyContact || null : undefined;
 
     if (finalRole === "resident") {
       if (
         normalizedBuilding !== undefined ||
-        normalizedVehicle !== undefined ||
+        normalizedVehicles !== undefined ||
         normalizedEmergencyContact !== undefined ||
         !existing.residents
       ) {
@@ -281,7 +294,9 @@ class UsersController {
           upsert: {
             create: {
               building: normalizedBuilding ?? null,
-              vehicle: normalizedVehicle ?? null,
+              vehicles: normalizedVehicles?.length
+                ? { create: normalizedVehicles }
+                : undefined,
               emergencyContact: normalizedEmergencyContact ?? null,
               condominiumId,
             },
@@ -289,8 +304,15 @@ class UsersController {
               ...(normalizedBuilding !== undefined
                 ? { building: normalizedBuilding }
                 : {}),
-              ...(normalizedVehicle !== undefined
-                ? { vehicle: normalizedVehicle }
+              ...(normalizedVehicles !== undefined
+                ? {
+                    vehicles: {
+                      deleteMany: {},
+                      ...(normalizedVehicles.length
+                        ? { create: normalizedVehicles }
+                        : {}),
+                    },
+                  }
                 : {}),
               ...(normalizedEmergencyContact !== undefined
                 ? { emergencyContact: normalizedEmergencyContact }

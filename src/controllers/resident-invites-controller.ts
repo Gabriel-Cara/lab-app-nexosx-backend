@@ -94,7 +94,7 @@ class ResidentInvitesController {
       phone,
       apartment,
       building,
-      vehicle,
+      vehicles,
       emergencyContact,
       password,
     } = residentSignupSchema.parse(request.body ?? {});
@@ -147,7 +147,15 @@ class ResidentInvitesController {
         residents: {
           create: {
             building: building ?? null,
-            vehicle: vehicle ?? null,
+            vehicles: vehicles?.length
+              ? {
+                  create: vehicles.map((vehicle) => ({
+                    model: vehicle.model.trim(),
+                    plate: vehicle.plate.trim(),
+                    year: vehicle.year,
+                  })),
+                }
+              : undefined,
             emergencyContact: emergencyContact ?? null,
             condominiumId: invite.condominiumId,
           },

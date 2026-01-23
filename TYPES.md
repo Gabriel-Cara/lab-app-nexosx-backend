@@ -46,7 +46,13 @@ role: enum[admin, staff, resident]
 phone: string *optional*
 apartment: string *optional*
 building: string *optional*
-vehicle: string *optional*
+vehicles: [
+  {
+    model: string
+    plate: string
+    year: number
+  }
+] *optional*
 emergencyContact: string *optional*
 ```
 
@@ -60,8 +66,13 @@ phone: string | null
 password: hash
 residents: {
   building: string | null
-  vehicle: string | null
   emergencyContact: string | null
+  vehicles: {
+    id: string
+    model: string
+    plate: string
+    year: number
+  }[]
 }
 ```
 
@@ -111,8 +122,13 @@ updatedAt: datetime
 residents: {
   id: string
   building: string | null
-  vehicle: string | null
   emergencyContact: string | null
+  vehicles: {
+    id: string
+    model: string
+    plate: string
+    year: number
+  }[]
   userId: string
 } | null
 ```
@@ -306,4 +322,3 @@ handledBy: {
   handledById: string | null
 } | null
 ```
-

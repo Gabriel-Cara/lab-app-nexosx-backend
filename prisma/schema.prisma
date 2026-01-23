@@ -199,10 +199,22 @@ model ResidentInfo {
   condominiumId    String  @map("condominium-id")
   condominium      Condominium @relation(fields: [condominiumId], references: [id])
   building         String?
-  vehicle          String?
   emergencyContact String? @map("emergency-contact")
+  vehicles         ResidentVehicle[]
 
   @@map("resident-infos")
+}
+
+model ResidentVehicle {
+  id             String @id @default(uuid())
+  residentInfo   ResidentInfo @relation(fields: [residentInfoId], references: [id], onDelete: Cascade)
+  residentInfoId String @map("resident-info-id")
+  model          String
+  plate          String
+  year           Int
+
+  @@index([residentInfoId])
+  @@map("resident-vehicles")
 }
 
 model Visitor {
