@@ -7,16 +7,38 @@ export interface NotificationPayload {
   message: string;
 }
 
+const parseProviders = (raw?: string | null): SupportedProvider[] => {
+  const tokens = (raw ?? "console")
+    .split(",")
+    .map((token) => token.trim())
+    .filter(Boolean);
+
+  const providers = new Set<SupportedProvider>();
+
+  for (const token of tokens) {
+    if (token === "console" || token === "twilio_sms" || token === "twilio_whatsapp") {
+      providers.add(token);
+    } else {
+      console.warn(`[notification] Provider desconhecido: ${token}`);
+    }
+  }
+
+  if (providers.size === 0) {
+    providers.add("console");
+  }
+
+  return Array.from(providers);
+};
+
 /**
  * This service encapsulates the logic to notify residents. It can be extended to integrate with
  * providers such as Twilio or AWS SNS. For this demo the provider simply logs in the console.
  */
 export const notifyResident = async ({ phone, message }: NotificationPayload) => {
-  const provider = (env.NOTIFICATION_PROVIDER ?? "console") as SupportedProvider;
+  const providers = parseProviders(env.NOTIFICATION_PROVIDER);
 
-  if (provider === "console") {
+  if (providers.includes("console")) {
     console.info(`[notification] Enviando mensagem para ${phone ?? "desconhecido"}: ${message}`);
-    return;
   }
 
   if (!phone) {
@@ -24,7 +46,11 @@ export const notifyResident = async ({ phone, message }: NotificationPayload) =>
     return;
   }
 
-  if (provider === "twilio_sms" || provider === "twilio_whatsapp") {
+  const twilioProviders = providers.filter(
+    (provider) => provider === "twilio_sms" || provider === "twilio_whatsapp"
+  );
+
+  if (twilioProviders.length > 0) {
     const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } = env;
     if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
       console.warn("[notification] Twilio não configurado (TWILIO_ACCOUNT_SID/TWILIO_AUTH_TOKEN)");
@@ -35,24 +61,32 @@ export const notifyResident = async ({ phone, message }: NotificationPayload) =>
     const { default: twilio } = await import("twilio");
     const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
 
-    const from =
-      provider === "twilio_sms" ? env.TWILIO_FROM_SMS : env.TWILIO_FROM_WHATSAPP;
+    for (const provider of twilioProviders) {
+      const from =
+        provider === "twilio_sms" ? env.TWILIO_FROM_SMS : env.TWILIO_FROM_WHATSAPP;
 
-    if (!from) {
-      console.warn(
-        `[notification] Twilio 'from' não configurado (${provider === "twilio_sms" ? "TWILIO_FROM_SMS" : "TWILIO_FROM_WHATSAPP"})`
-      );
-      return;
+      if (!from) {
+        console.warn(
+          `[notification] Twilio 'from' não configurado (${provider === "twilio_sms" ? "TWILIO_FROM_SMS" : "TWILIO_FROM_WHATSAPP"})`
+        );
+        continue;
+      }
+
+      const to = provider === "twilio_whatsapp" ? `whatsapp:${phone}` : phone;
+      const fromFinal =
+        provider === "twilio_whatsapp"
+          ? from.startsWith("whatsapp:")
+            ? from
+            : `whatsapp:${from}`
+          : from;
+
+      await client.messages.create({
+        body: message,
+        from: fromFinal,
+        to,
+      });
     }
 
-    const to = provider === "twilio_whatsapp" ? `whatsapp:${phone}` : phone;
-    const fromFinal = provider === "twilio_whatsapp" ? (from.startsWith("whatsapp:") ? from : `whatsapp:${from}`) : from;
-
-    await client.messages.create({
-      body: message,
-      from: fromFinal,
-      to,
-    });
     return;
   }
 

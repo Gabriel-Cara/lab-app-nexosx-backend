@@ -7,7 +7,7 @@ export function normalizePhoneE164(value?: string | null) {
 
   const local = digits.startsWith("55") ? digits.slice(2) : digits;
 
-  if (local.length !== 11) {
+  if (local.length !== 10 && local.length !== 11) {
     return null;
   }
 

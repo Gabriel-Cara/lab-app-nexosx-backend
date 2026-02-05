@@ -6,7 +6,7 @@ const envSchema = z.object({
   NOTIFICATION_PROVIDER: z.string().default("console"),
 
    // Twilio (optional)
-  // Used when NOTIFICATION_PROVIDER is "twilio_sms" or "twilio_whatsapp"
+  // Used when NOTIFICATION_PROVIDER includes "twilio_sms" and/or "twilio_whatsapp" (comma-separated allowed)
   TWILIO_ACCOUNT_SID: z.string().optional(),
   TWILIO_AUTH_TOKEN: z.string().optional(),
   // e.g. +14155552671
