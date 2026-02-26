@@ -66,14 +66,12 @@ class PackagesController {
       },
     });
 
-    if (pkg.resident.phone) {
-      await notifyResident({
-        phone: pkg.resident.phone,
-        message: `Olá ${pkg.resident.name}, sua encomenda chegou! Código de retirada: ${code}. (Válido por ${env.PACKAGE_CODE_TTL_MINUTES} minutos)`,
-      });
-    }
+    const notification = await notifyResident({
+      phone: pkg.resident.phone ?? undefined,
+      message: `Olá ${pkg.resident.name}, sua encomenda chegou! Código de retirada: ${code}. (Válido por ${env.PACKAGE_CODE_TTL_MINUTES} minutos)`,
+    });
 
-    return response.status(201).json(pkg);
+    return response.status(201).json({ ...pkg, notification });
   }
 
   async list(request: Request, response: Response) {
