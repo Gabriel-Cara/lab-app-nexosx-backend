@@ -59,7 +59,7 @@ export const notifyResident = async ({
     return {
       status: "skipped",
       reason: "missing_phone",
-      message: "Encomenda criada, mas o morador não tem telefone cadastrado.",
+      message: "Morador sem telefone cadastrado.",
     };
   }
 
@@ -76,6 +76,7 @@ export const notifyResident = async ({
     return {
       status: "skipped",
       reason: "no_external_provider",
+      message: "Envio de notificações não configurado.",
     };
   }
 
@@ -85,8 +86,7 @@ export const notifyResident = async ({
     return {
       status: "failed",
       reason: "twilio_not_configured",
-      message:
-        "Encomenda criada, mas o envio do código falhou: Twilio não configurado.",
+      message: "Twilio não configurado.",
     };
   }
 
@@ -105,8 +105,7 @@ export const notifyResident = async ({
     return {
       status: "failed",
       reason: "twilio_error",
-      message:
-        "Encomenda criada, mas não foi possível enviar o código via Twilio.",
+      message: "Falha ao enviar via Twilio.",
     };
   }
 
@@ -159,15 +158,13 @@ export const notifyResident = async ({
     return {
       status: "failed",
       reason: "twilio_from_missing",
-      message:
-        "Encomenda criada, mas o envio do código falhou: número de origem do Twilio não configurado.",
+      message: "Número de origem do Twilio não configurado.",
     };
   }
 
   return {
     status: "failed",
     reason: "twilio_error",
-    message:
-      "Encomenda criada, mas não foi possível enviar o código via Twilio.",
+    message: "Falha ao enviar via Twilio.",
   };
 };

@@ -74,6 +74,73 @@ class PackagesController {
     return response.status(201).json({ ...pkg, notification });
   }
 
+  async resendCode(request: Request, response: Response) {
+    const condominiumId = requireCondominiumId(request);
+    const { id } = packageParamsSchema.parse(request.params);
+
+    const pkg = await prisma.package.findFirst({
+      where: { id, condominiumId },
+      select: {
+        id: true,
+        status: true,
+        residentId: true,
+        resident: { select: { name: true, phone: true } },
+      },
+    });
+
+    if (!pkg) {
+      throw new AppError("Package not found", 404);
+    }
+
+    if (pkg.status === "retrieved") {
+      throw new AppError("Package already retrieved", 400);
+    }
+
+    if (pkg.status === "cancelled") {
+      throw new AppError("Package cancelled", 400);
+    }
+
+    if (pkg.status !== "pending" && pkg.status !== "delayed") {
+      throw new AppError("Package is not pending", 400);
+    }
+
+    const code = generateCode(6);
+    const codeHash = await bcrypt.hash(code, 10);
+    const expiresAt = new Date(Date.now() + env.PACKAGE_CODE_TTL_MINUTES * 60 * 1000);
+    const codeHint = `**${code.slice(-2)}`;
+
+    const notification = await notifyResident({
+      phone: pkg.resident.phone ?? undefined,
+      message: `Olá ${pkg.resident.name}, seu código de retirada foi reenviado: ${code}. (Válido por ${env.PACKAGE_CODE_TTL_MINUTES} minutos)`,
+    });
+
+    if (notification.status !== "sent") {
+      const reasonMessage =
+        notification.message ?? "não foi possível enviar o código ao morador.";
+      const message = `Não foi possível reenviar o código: ${reasonMessage}`;
+      const statusCode =
+        notification.reason === "twilio_error" ||
+        notification.reason === "twilio_not_configured" ||
+        notification.reason === "twilio_from_missing"
+          ? 502
+          : 400;
+
+      throw new AppError(message, statusCode);
+    }
+
+    await prisma.package.update({
+      where: { id },
+      data: {
+        codeHash,
+        codeExpiresAt: expiresAt,
+        codeAttempts: 0,
+        codeHint,
+      },
+    });
+
+    return response.json({ ok: true });
+  }
+
   async list(request: Request, response: Response) {
     const condominiumId = requireCondominiumId(request);
     const { role, id } = request.user!;

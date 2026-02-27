@@ -10,6 +10,12 @@ const packagesController = new PackagesController();
 
 packagesRoutes.get("/", authenticate, packagesController.list);
 packagesRoutes.post("/", authenticate, authorize(["admin", "staff"]) , packagesController.create);
+packagesRoutes.post(
+  "/:id/resend-code",
+  authenticate,
+  authorize(["admin", "staff"]),
+  packagesController.resendCode
+);
 packagesRoutes.patch("/:id", authenticate, authorize(["admin", "staff"]) , packagesController.update);
 packagesRoutes.patch("/:id/retrieve", authenticate, authorize(["admin", "staff"]) , packagesController.retrieve);
 packagesRoutes.patch("/:id/cancel", authenticate, authorize(["admin", "staff"]) , packagesController.cancel);
