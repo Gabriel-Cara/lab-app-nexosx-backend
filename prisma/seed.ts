@@ -47,14 +47,14 @@ const AREAS: AreaSeed[] = [
   },
 ]
 
-const MASTER_EMAIL = process.env.MASTER_EMAIL ?? "master@nexus.local"
+const MASTER_EMAIL = process.env.MASTER_EMAIL ?? "master@nexosx.local"
 const MASTER_NAME = process.env.MASTER_NAME ?? "Master"
 const MASTER_PASSWORD = process.env.MASTER_PASSWORD ?? "ChangeMe123!"
 
 const DEFAULT_CONDOMINIUM_CODE = process.env.SEED_CONDOMINIUM_CODE ?? "demo"
 const DEFAULT_CONDOMINIUM_NAME = process.env.SEED_CONDOMINIUM_NAME ?? "Condomínio Demo"
 const SEED_ADMIN_NAME = process.env.SEED_ADMIN_NAME ?? "Admin Demo"
-const SEED_ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? "admin@nexus.local"
+const SEED_ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? "admin@nexosx.local"
 const SEED_ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? "Admin123!"
 
 function toMinutes(time: string) {

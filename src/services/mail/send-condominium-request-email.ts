@@ -88,7 +88,7 @@ function renderEmailTemplate({ title, body, cta }: EmailTemplateInput) {
               <tr>
                 <td align="center" style="padding-top: 32px;">
                   <p style="font-size: 12px; color: #9ca3af; margin: 0;">
-                    © ${new Date().getFullYear()} nexus
+                    © ${new Date().getFullYear()} nexosx
                   </p>
                 </td>
               </tr>
