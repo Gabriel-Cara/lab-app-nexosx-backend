@@ -14,6 +14,25 @@ import {
 } from "@/validators/package-schemas";
 import { Request, Response } from "express";
 
+const buildPackageWhatsappTemplate = (code: string) => {
+  const normalizedCode = String(code).trim();
+
+  if (!env.TWILIO_WHATSAPP_AUTH_CONTENT_SID) {
+    return undefined;
+  }
+
+  if (!normalizedCode) {
+    return undefined;
+  }
+
+  return {
+    contentSid: env.TWILIO_WHATSAPP_AUTH_CONTENT_SID,
+    contentVariables: {
+      1: normalizedCode,
+    },
+  };
+};
+
 class PackagesController {
   async create(request: Request, response: Response) {
     const condominiumId = requireCondominiumId(request);
@@ -31,7 +50,9 @@ class PackagesController {
 
     const code = generateCode(6);
     const codeHash = await bcrypt.hash(code, 10);
-    const expiresAt = new Date(Date.now() + env.PACKAGE_CODE_TTL_MINUTES * 60 * 1000);
+    const expiresAt = new Date(
+      Date.now() + env.PACKAGE_CODE_TTL_MINUTES * 60 * 1000,
+    );
     const codeHint = `**${code.slice(-2)}`;
 
     const pkg = await prisma.package.create({
@@ -69,6 +90,7 @@ class PackagesController {
     const notification = await notifyResident({
       phone: pkg.resident.phone ?? undefined,
       message: `Olá ${pkg.resident.name}, sua encomenda chegou! Código de retirada: ${code}. (Válido por ${env.PACKAGE_CODE_TTL_MINUTES} minutos)`,
+      whatsappTemplate: buildPackageWhatsappTemplate(code),
     });
 
     return response.status(201).json({ ...pkg, notification });
@@ -83,6 +105,8 @@ class PackagesController {
       select: {
         id: true,
         status: true,
+        description: true,
+        carrier: true,
         residentId: true,
         resident: { select: { name: true, phone: true } },
       },
@@ -106,12 +130,15 @@ class PackagesController {
 
     const code = generateCode(6);
     const codeHash = await bcrypt.hash(code, 10);
-    const expiresAt = new Date(Date.now() + env.PACKAGE_CODE_TTL_MINUTES * 60 * 1000);
+    const expiresAt = new Date(
+      Date.now() + env.PACKAGE_CODE_TTL_MINUTES * 60 * 1000,
+    );
     const codeHint = `**${code.slice(-2)}`;
 
     const notification = await notifyResident({
       phone: pkg.resident.phone ?? undefined,
       message: `Olá ${pkg.resident.name}, seu código de retirada foi reenviado: ${code}. (Válido por ${env.PACKAGE_CODE_TTL_MINUTES} minutos)`,
+      whatsappTemplate: buildPackageWhatsappTemplate(code),
     });
 
     if (notification.status !== "sent") {
@@ -138,7 +165,7 @@ class PackagesController {
       },
     });
 
-    return response.json({ ok: true });
+    return response.json({ ok: true, notification });
   }
 
   async list(request: Request, response: Response) {
@@ -337,7 +364,7 @@ class PackagesController {
             },
           });
         },
-        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );
 
       if (!updated) {

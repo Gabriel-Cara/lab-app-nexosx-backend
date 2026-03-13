@@ -5,7 +5,7 @@ const envSchema = z.object({
   DATABASE_URL: z.string(),
   NOTIFICATION_PROVIDER: z.string().default("console"),
 
-   // Twilio (optional)
+  // Twilio (optional)
   // Used when NOTIFICATION_PROVIDER includes "twilio_sms" and/or "twilio_whatsapp" (comma-separated allowed)
   TWILIO_ACCOUNT_SID: z.string().optional(),
   TWILIO_AUTH_TOKEN: z.string().optional(),
@@ -14,6 +14,10 @@ const envSchema = z.object({
   // e.g. whatsapp:+14155238886
   TWILIO_FROM_WHATSAPP: z.string().optional(),
 
+  // Optional approved WhatsApp templates (Content Template Builder)
+  // Maps the variables in order, e.g. "name,code,ttl" or "name,description,code,ttl"
+  TWILIO_WHATSAPP_AUTH_CONTENT_SID: z.string().optional(),
+
   // Package pickup code settings
   PACKAGE_CODE_TTL_MINUTES: z.coerce.number().int().positive().default(60 * 48),
   PACKAGE_CODE_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
@@ -21,7 +25,7 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string(),
   // For local/testing with Resend you can use: onboarding@resend.dev
   MAIL_FROM: z.string().default("onboarding@resend.dev"),
-  PORT: z.coerce.number().default(3000)
+  PORT: z.coerce.number().default(3000),
 });
 
 export const env = envSchema.parse(process.env);
