@@ -15,13 +15,50 @@ import {
 } from "@/utils/datetime";
 import { requireCondominiumId } from "@/utils/condominium";
 
+function getTodayStart(reference = new Date()) {
+  const today = new Date(reference);
+  today.setHours(0, 0, 0, 0);
+  return today;
+}
+
+function getReservationWindowEnd(reference = new Date()) {
+  const today = getTodayStart(reference);
+  const nextMonth = today.getMonth() + 1;
+  const lastDayOfNextMonth = new Date(
+    today.getFullYear(),
+    today.getMonth() + 2,
+    0,
+  ).getDate();
+  const targetDay = Math.min(today.getDate(), lastDayOfNextMonth);
+
+  return new Date(today.getFullYear(), nextMonth, targetDay);
+}
+
+function assertReservationDateAllowed(reservationDate: Date, referenceDate = new Date()) {
+  const todayStart = getTodayStart(referenceDate);
+
+  if (reservationDate < todayStart) {
+    throw new AppError("Reservations cannot be created for past dates", 400);
+  }
+
+  const reservationWindowEnd = getReservationWindowEnd(referenceDate);
+
+  if (reservationDate > reservationWindowEnd) {
+    throw new AppError(
+      "Reservations are only available within 1 month from today",
+      400,
+    );
+  }
+}
+
 class ReservationsController {
   async create(request: Request, response: Response) {
     const condominiumId = requireCondominiumId(request);
     const { areaId, date, startSlotId, endSlotId, purpose } =
       createReservationSchema.parse(request.body);
 
-    const reservationDate = normalizeDate(date)
+    const reservationDate = normalizeDate(date);
+    assertReservationDateAllowed(reservationDate);
     const residentId = request.user!.id;
 
     try {

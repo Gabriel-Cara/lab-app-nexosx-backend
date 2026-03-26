@@ -3,6 +3,10 @@ import { hash } from "bcrypt";
 
 import { prisma } from "@/database/prisma";
 import { env } from "@/env";
+import {
+  createInvitePasswordSetup,
+  isInviteExpired,
+} from "@/services/invites/invite-signup";
 import { AppError } from "@/utils/app-error";
 import { requireCondominiumId } from "@/utils/condominium";
 import { generateInviteToken, hashInviteToken } from "@/utils/invite-token";
@@ -12,7 +16,6 @@ import {
   staffSignupSchema,
 } from "@/validators/staff-invite-schemas";
 import { generateRandomPassword } from "@/utils/generate-random-password";
-import { generateSetupToken, hashSetupToken } from "@/utils/password-setup-token";
 import { sendPasswordSetupEmail } from "@/services/mail/send-password-setup-email";
 import { sendAccountConfirmationEmail } from "@/services/mail/send-account-confirmation-email";
 
@@ -85,7 +88,7 @@ class StaffInvitesController {
       throw new AppError("Invite not found", 404);
     }
 
-    if (invite.expiresAt.getTime() < Date.now()) {
+    if (isInviteExpired(invite.expiresAt)) {
       throw new AppError("Invite expired", 410);
     }
 
@@ -101,91 +104,96 @@ class StaffInvitesController {
     );
 
     const tokenHash = hashInviteToken(token);
-
-    const invite = await prisma.staffInvite.findUnique({
-      where: { tokenHash },
-      include: {
-        condominium: {
-          select: { id: true, name: true, code: true },
-        },
-      },
-    });
-
-    if (!invite) {
-      throw new AppError("Invite not found", 404);
-    }
-
-    if (invite.expiresAt.getTime() < Date.now()) {
-      throw new AppError("Invite expired", 410);
-    }
-
-    const existing = await prisma.user.findUnique({
-      where: {
-        condominiumId_email: {
-          condominiumId: invite.condominiumId,
-          email,
-        },
-      },
-      select: { id: true },
-    });
-
-    if (existing) {
-      throw new AppError("Email already in use", 400);
-    }
-
     const generatedPassword = password ?? generateRandomPassword(32);
     const hashedPassword = await hash(generatedPassword, 8);
+    const setupToken = createInvitePasswordSetup(password);
 
-    const created = await prisma.user.create({
-      data: {
-        name,
-        email,
-        phone: phone ?? null,
-        shift: shift?.trim() || null,
-        role: "staff",
-        condominiumId: invite.condominiumId,
-        password: hashedPassword,
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-      },
-    });
-
-    if (!password) {
-      const setupToken = generateSetupToken();
-      const setupTokenHash = hashSetupToken(setupToken);
-      const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-
-      await prisma.passwordSetupToken.upsert({
-        where: { userId: created.id },
-        update: {
-          tokenHash: setupTokenHash,
-          expiresAt,
-          usedAt: null,
-        },
-        create: {
-          userId: created.id,
-          tokenHash: setupTokenHash,
-          expiresAt,
+    const result = await prisma.$transaction(async (tx) => {
+      const invite = await tx.staffInvite.findUnique({
+        where: { tokenHash },
+        include: {
+          condominium: {
+            select: { id: true, name: true, code: true },
+          },
         },
       });
 
-      await sendPasswordSetupEmail(created.email, created.name, setupToken);
+      if (!invite) {
+        throw new AppError("Invite not found", 404);
+      }
+
+      if (isInviteExpired(invite.expiresAt)) {
+        throw new AppError("Invite expired", 410);
+      }
+
+      const existing = await tx.user.findUnique({
+        where: {
+          condominiumId_email: {
+            condominiumId: invite.condominiumId,
+            email,
+          },
+        },
+        select: { id: true },
+      });
+
+      if (existing) {
+        throw new AppError("Email already in use", 400);
+      }
+
+      const created = await tx.user.create({
+        data: {
+          name,
+          email,
+          phone: phone ?? null,
+          shift: shift?.trim() || null,
+          role: "staff",
+          condominiumId: invite.condominiumId,
+          password: hashedPassword,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+        },
+      });
+
+      if (setupToken) {
+        await tx.passwordSetupToken.upsert({
+          where: { userId: created.id },
+          update: {
+            tokenHash: setupToken.tokenHash,
+            expiresAt: setupToken.expiresAt,
+            usedAt: null,
+          },
+          create: {
+            userId: created.id,
+            tokenHash: setupToken.tokenHash,
+            expiresAt: setupToken.expiresAt,
+          },
+        });
+      }
+
+      return {
+        user: created,
+        condominium: invite.condominium,
+      };
+    });
+
+    if (setupToken) {
+      await sendPasswordSetupEmail(result.user.email, result.user.name, setupToken.token);
     } else {
       await sendAccountConfirmationEmail({
-        email: created.email,
-        name: created.name,
-        condominiumName: invite.condominium?.name,
-        condominiumCode: invite.condominium?.code,
+        email: result.user.email,
+        name: result.user.name,
+        condominiumName: result.condominium?.name,
+        condominiumCode: result.condominium?.code,
       });
     }
 
     return response.status(201).json({
-      user: created,
-      condominium: invite.condominium,
+      user: result.user,
+      condominium: result.condominium,
     });
   }
 }

@@ -23,6 +23,7 @@ export const userSelect = {
           id: true,
           model: true,
           plate: true,
+          parkingSpot: true,
           year: true,
         },
       },

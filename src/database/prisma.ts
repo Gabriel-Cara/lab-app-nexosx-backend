@@ -1,7 +1,7 @@
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 
 const isProduction = process.env.NODE_ENV === "production";
-const logLevels = isProduction
+const logLevels: Prisma.LogLevel[] = isProduction
   ? ["warn", "error"]
   : ["query", "info", "warn", "error"];
 

@@ -82,10 +82,11 @@ const swaggerDocument = {
             type: "array",
             items: {
               type: "object",
-              required: ["model", "plate", "year"],
+              required: ["model", "plate", "parkingSpot", "year"],
               properties: {
                 model: { type: "string" },
                 plate: { type: "string" },
+                parkingSpot: { type: "string" },
                 year: { type: "integer" },
               },
             },
@@ -310,6 +311,19 @@ const swaggerDocument = {
           },
           visitReason: { type: "string", nullable: true },
           hostId: { type: "string", format: "uuid" },
+          unlimitedAccess: {
+            type: "boolean",
+            default: false,
+            description:
+              "Quando ativo, a visita não exige aprovação e permite múltiplas entradas e saídas.",
+          },
+          allowedHours: {
+            type: "integer",
+            nullable: true,
+            minimum: 1,
+            description:
+              "Quantidade de horas que o visitante pode permanecer no condomínio quando a visita não for sem limite.",
+          },
         },
       },
     },

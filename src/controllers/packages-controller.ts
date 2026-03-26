@@ -135,6 +135,24 @@ class PackagesController {
     );
     const codeHint = `**${code.slice(-2)}`;
 
+    const updateResult = await prisma.package.updateMany({
+      where: {
+        id,
+        condominiumId,
+        status: { in: ["pending", "delayed"] },
+      },
+      data: {
+        codeHash,
+        codeExpiresAt: expiresAt,
+        codeAttempts: 0,
+        codeHint,
+      },
+    });
+
+    if (updateResult.count === 0) {
+      throw new AppError("Package is not pending", 400);
+    }
+
     const notification = await notifyResident({
       phone: pkg.resident.phone ?? undefined,
       message: `Olá ${pkg.resident.name}, seu código de retirada foi reenviado: ${code}. (Válido por ${env.PACKAGE_CODE_TTL_MINUTES} minutos)`,
@@ -154,16 +172,6 @@ class PackagesController {
 
       throw new AppError(message, statusCode);
     }
-
-    await prisma.package.update({
-      where: { id },
-      data: {
-        codeHash,
-        codeExpiresAt: expiresAt,
-        codeAttempts: 0,
-        codeHint,
-      },
-    });
 
     return response.json({ ok: true, notification });
   }

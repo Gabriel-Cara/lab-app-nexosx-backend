@@ -211,45 +211,52 @@ model ResidentVehicle {
   residentInfoId String @map("resident-info-id")
   model          String
   plate          String
+  parkingSpot    String? @map("parking-spot")
   year           Int
 
   @@index([residentInfoId])
+  @@index([plate])
   @@map("resident-vehicles")
 }
 
 model Visitor {
-  id          String        @id @default(uuid())
-  name        String
-  document    String
-  phone       String?
-  visitReason String?       @map("visit-reason")
-  status      VisitorStatus @default(pending)
-  condominiumId String      @map("condominium-id")
-  condominium   Condominium @relation(fields: [condominiumId], references: [id])
-  createdAt   DateTime      @default(now()) @map("created-at")
-  updatedAt   DateTime      @updatedAt @map("updated-at")
-  logs        VisitLog[]
+  id              String        @id @default(uuid())
+  name            String
+  document        String
+  phone           String?
+  visitReason     String?       @map("visit-reason")
+  status          VisitorStatus @default(pending)
+  unlimitedAccess Boolean       @default(false) @map("unlimited-access")
+  allowedHours    Int?          @map("allowed-hours")
+  condominiumId   String        @map("condominium-id")
+  condominium     Condominium   @relation(fields: [condominiumId], references: [id])
+  createdAt       DateTime      @default(now()) @map("created-at")
+  updatedAt       DateTime      @updatedAt @map("updated-at")
+  logs            VisitLog[]
 
   @@unique([condominiumId, document])
   @@map("visitors")
 }
 
 model VisitLog {
-  id          String        @id @default(uuid())
-  visitor     Visitor       @relation(fields: [visitorId], references: [id])
-  visitorId   String        @map("visitor-id")
-  host        User          @relation("visit-host", fields: [hostId], references: [id])
-  hostId      String        @map("host-id")
-  entryTime   DateTime?     @map("entry-time")
-  exitTime    DateTime?     @map("exit-time")
-  notes       String?
-  handledBy   User?         @relation("handled-by", fields: [handledById], references: [id])
-  handledById String?
-  status      VisitorStatus @default(pending)
-  imageUrl    String?       @map("image-url")
-  condominiumId String      @map("condominium-id")
-  condominium   Condominium @relation(fields: [condominiumId], references: [id])
-  createdAt   DateTime      @default(now()) @map("created-at")
+  id              String        @id @default(uuid())
+  visitor         Visitor       @relation(fields: [visitorId], references: [id])
+  visitorId       String        @map("visitor-id")
+  host            User          @relation("visit-host", fields: [hostId], references: [id])
+  hostId          String        @map("host-id")
+  entryTime       DateTime?     @map("entry-time")
+  exitTime        DateTime?     @map("exit-time")
+  expectedExitTime DateTime?    @map("expected-exit-time")
+  notes           String?
+  handledBy       User?         @relation("handled-by", fields: [handledById], references: [id])
+  handledById     String?
+  status          VisitorStatus @default(pending)
+  unlimitedAccess Boolean       @default(false) @map("unlimited-access")
+  allowedHours    Int?          @map("allowed-hours")
+  imageUrl        String?       @map("image-url")
+  condominiumId   String        @map("condominium-id")
+  condominium     Condominium   @relation(fields: [condominiumId], references: [id])
+  createdAt       DateTime      @default(now()) @map("created-at")
 
   @@map("visit-logs")
 }

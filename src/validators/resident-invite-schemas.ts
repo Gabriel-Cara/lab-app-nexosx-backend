@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { optionalPhoneSchema } from "@/validators/auth-schemas";
+import { normalizeParkingSpot, normalizeVehiclePlate } from "@/utils/vehicle";
 
 const optionalPasswordSchema = z.preprocess(
   (value) =>
@@ -16,7 +17,14 @@ const optionalTextSchema = z.preprocess(
 
 const residentVehicleSchema = z.object({
   model: z.string().min(1),
-  plate: z.string().min(1),
+  plate: z.string().min(1).refine(
+    (value) => normalizeVehiclePlate(value).length > 0,
+    "Placa inválida"
+  ),
+  parkingSpot: z.string().min(1).refine(
+    (value) => normalizeParkingSpot(value).length > 0,
+    "Vaga inválida"
+  ),
   year: z.coerce.number().int(),
 });
 

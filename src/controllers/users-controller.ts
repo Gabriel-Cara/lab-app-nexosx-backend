@@ -21,6 +21,11 @@ import { sendPasswordSetupEmail } from "@/services/mail/send-password-setup-emai
 import { generateRandomPassword } from "@/utils/generate-random-password";
 import { deleteUserWithRelations } from "@/services/user-deletion-service";
 import { requireCondominiumId } from "@/utils/condominium";
+import {
+  formatLegacyVehiclePlate,
+  normalizeParkingSpot,
+  normalizeVehiclePlate,
+} from "@/utils/vehicle";
 
 class UsersController {
   async create(request: Request, response: Response) {
@@ -40,7 +45,8 @@ class UsersController {
     const normalizedShift = shift?.trim();
     const normalizedVehicles = vehicles?.map((vehicle) => ({
       model: vehicle.model.trim(),
-      plate: vehicle.plate.trim(),
+      plate: normalizeVehiclePlate(vehicle.plate),
+      parkingSpot: normalizeParkingSpot(vehicle.parkingSpot),
       year: vehicle.year,
     }));
 
@@ -169,6 +175,12 @@ class UsersController {
       page,
       limit,
     } = paramsSchema.parse(request.query);
+    const normalizedVehicleSearch = search
+      ? normalizeVehiclePlate(search)
+      : "";
+    const legacyVehicleSearch = normalizedVehicleSearch
+      ? formatLegacyVehiclePlate(normalizedVehicleSearch)
+      : "";
 
     const where: Prisma.UserWhereInput = {
       condominiumId,
@@ -185,6 +197,82 @@ class UsersController {
               { email: { contains: search, mode: "insensitive" } },
               { phone: { contains: search, mode: "insensitive" } },
               { apartment: { contains: search, mode: "insensitive" } },
+              {
+                residents: {
+                  is: {
+                    building: { contains: search, mode: "insensitive" },
+                  },
+                },
+              },
+              {
+                residents: {
+                  is: {
+                    emergencyContact: {
+                      contains: search,
+                      mode: "insensitive",
+                    },
+                  },
+                },
+              },
+              {
+                residents: {
+                  is: {
+                    vehicles: {
+                      some: {
+                        model: { contains: search, mode: "insensitive" },
+                      },
+                    },
+                  },
+                },
+              },
+              {
+                residents: {
+                  is: {
+                    vehicles: {
+                      some: {
+                        parkingSpot: {
+                          contains: search,
+                          mode: "insensitive",
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              ...(normalizedVehicleSearch
+                ? [
+                    {
+                      residents: {
+                        is: {
+                          vehicles: {
+                            some: {
+                              plate: {
+                                startsWith: normalizedVehicleSearch,
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                    ...(legacyVehicleSearch !== normalizedVehicleSearch
+                      ? [
+                          {
+                            residents: {
+                              is: {
+                                vehicles: {
+                                  some: {
+                                    plate: {
+                                      startsWith: legacyVehicleSearch,
+                                    },
+                                  },
+                                },
+                              },
+                            },
+                          },
+                        ]
+                      : []),
+                  ]
+                : []),
             ],
           }
         : {}),
@@ -276,7 +364,8 @@ class UsersController {
       vehicles !== undefined
         ? vehicles.map((vehicle) => ({
             model: vehicle.model.trim(),
-            plate: vehicle.plate.trim(),
+            plate: normalizeVehiclePlate(vehicle.plate),
+            parkingSpot: normalizeParkingSpot(vehicle.parkingSpot),
             year: vehicle.year,
           }))
         : undefined;
