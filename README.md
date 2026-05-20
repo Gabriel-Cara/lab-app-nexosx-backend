@@ -26,7 +26,7 @@ src/
 
 - **Validação**: Todos os payloads de entrada passam por schemas Zod, garantindo contratos explícitos e mensagens de erro consistentes.
 - **Persistência**: Prisma Client com Postgres, incluindo enums para papeis de usuário e status de reservas.
-- **Autenticação**: JWT com rotas protegidas via middlewares `authenticate` e `authorize`, suportando perfis `admin`, `staff` e `resident`.
+- **Autenticação**: JWT com rotas protegidas via middlewares `authenticate` e `authorize`, suportando perfis `admin`, `manager`, `doorman` e `resident`.
 - **Tratamento de erros**: Classe `AppError` para erros previsíveis e middleware centralizado que traduz exceções em respostas HTTP padronizadas.
 - **Notificações**: Serviço em `services/notification-service.ts` preparado para expansão, enviando log no console por padrão.
 
@@ -101,7 +101,7 @@ A página carrega os assets do Swagger UI via CDN público, portanto é necessá
 ## Casos de Uso Principais
 
 - **Autenticação**: `POST /auth/login` gera token JWT. `GET /auth/me` retorna dados do usuário autenticado.
-- **Gestão de usuários**: `POST /auth/users` e `GET /auth/users` (restritas a administradores/funcionários).
+- **Gestão de usuários**: `POST /auth/users` e `GET /auth/users` (restritas a administradores/gestores/portaria).
 - **Áreas comuns**: CRUD completo em `/areas` para cadastro e manutenção.
 - **Eventos**: criação/listagem de eventos e inscrição de moradores (`/events/book`).
 - **Encomendas**: registro de chegada, listagem por perfil e confirmação de retirada com validação de código.

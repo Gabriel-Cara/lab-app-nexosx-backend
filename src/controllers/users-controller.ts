@@ -26,6 +26,7 @@ import {
   normalizeParkingSpot,
   normalizeVehiclePlate,
 } from "@/utils/vehicle";
+import { resolveResidenceAssignment } from "@/utils/residence";
 
 class UsersController {
   async create(request: Request, response: Response) {
@@ -36,6 +37,7 @@ class UsersController {
       phone,
       role,
       apartment,
+      residenceId,
       shift,
       password,
       building,
@@ -68,36 +70,49 @@ class UsersController {
     const generatedPassword = password ?? generateRandomPassword(32);
     const hashedPassword = await hash(generatedPassword, 8);
 
-    const created = await prisma.user.create({
-      data: {
-        name,
-        email,
-        phone: phone ?? null,
-        role,
-        apartment: apartment ?? null,
-        shift: normalizedShift || null,
-        condominiumId,
-        password: hashedPassword,
-        ...(role === "resident"
-          ? {
-              residents: {
-                create: {
-                  building,
-                  vehicles: normalizedVehicles?.length
-                    ? { create: normalizedVehicles }
-                    : undefined,
-                  emergencyContact: emergencyContact ?? null,
-                  condominiumId,
+    const created = await prisma.$transaction(async (tx) => {
+      const residenceAssignment =
+        role === "resident"
+          ? await resolveResidenceAssignment(tx, {
+              condominiumId,
+              residenceId,
+              apartment,
+              building,
+            })
+          : { residenceId: null, apartment: apartment ?? null, building };
+
+      return tx.user.create({
+        data: {
+          name,
+          email,
+          phone: phone ?? null,
+          role,
+          residenceId: residenceAssignment.residenceId,
+          apartment: residenceAssignment.apartment,
+          shift: normalizedShift || null,
+          condominiumId,
+          password: hashedPassword,
+          ...(role === "resident"
+            ? {
+                residents: {
+                  create: {
+                    building: residenceAssignment.building,
+                    vehicles: normalizedVehicles?.length
+                      ? { create: normalizedVehicles }
+                      : undefined,
+                    emergencyContact: emergencyContact ?? null,
+                    condominiumId,
+                  },
                 },
-              },
-            }
-          : {}),
-      },
+              }
+            : {}),
+        },
+      });
     });
 
     // Invite flow: if staff created a resident/staff without specifying a password,
     // send an email with a one-time token so the user can set their own password.
-    if ((role === "resident" || role === "staff") && !password) {
+    if ((role === "resident" || role === "doorman") && !password) {
       const token = generateSetupToken();
       const tokenHash = hashSetupToken(token);
 
@@ -138,7 +153,7 @@ class UsersController {
       where: { id: userId, condominiumId },
     });
 
-    if (!user || (user.role !== "resident" && user.role !== "staff")) {
+    if (!user || (user.role !== "resident" && user.role !== "doorman")) {
       return response.status(404).json({ message: "Usuário não encontrado" });
     }
 
@@ -311,6 +326,7 @@ class UsersController {
       phone,
       role,
       apartment,
+      residenceId,
       shift,
       password,
       building,
@@ -320,7 +336,7 @@ class UsersController {
 
     const existing = await prisma.user.findFirst({
       where: { id, condominiumId },
-      include: { residents: true },
+      include: { residents: true, residence: { include: { block: true } } },
     });
 
     if (!existing) {
@@ -352,6 +368,30 @@ class UsersController {
     if (apartment !== undefined) data.apartment = apartment ?? null;
     if (shift !== undefined) data.shift = shift?.trim() || null;
 
+    let resolvedResidenceBuilding: string | null | undefined;
+
+    if (
+      (role ?? existing.role) === "resident" &&
+      (residenceId !== undefined || apartment !== undefined || building !== undefined)
+    ) {
+      const residenceAssignment = await resolveResidenceAssignment(prisma, {
+        condominiumId,
+        residenceId,
+        apartment: apartment ?? existing.apartment,
+        building: building ?? existing.residence?.block.name ?? existing.residents?.building,
+      });
+
+      data.residence = residenceAssignment.residenceId
+        ? { connect: { id: residenceAssignment.residenceId } }
+        : { disconnect: true };
+      data.apartment = residenceAssignment.apartment;
+      resolvedResidenceBuilding = residenceAssignment.building;
+    }
+
+    if ((role ?? existing.role) !== "resident" && existing.residenceId) {
+      data.residence = { disconnect: true };
+    }
+
     if (password) {
       data.password = await hash(password, 8);
     }
@@ -359,7 +399,11 @@ class UsersController {
     const finalRole = role ?? existing.role;
 
     const normalizedBuilding =
-      building !== undefined ? building || null : undefined;
+      resolvedResidenceBuilding !== undefined
+        ? resolvedResidenceBuilding
+        : building !== undefined
+          ? building || null
+          : undefined;
     const normalizedVehicles =
       vehicles !== undefined
         ? vehicles.map((vehicle) => ({

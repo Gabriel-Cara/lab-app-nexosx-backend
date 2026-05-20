@@ -7,8 +7,8 @@ import { requireCondominiumId } from "@/utils/condominium";
 
 type AuthenticatedUser = NonNullable<Request["user"]>;
 
-const staffRoles = new Set(["admin", "staff"]);
-const visitRoles = new Set(["admin", "staff", "resident"]);
+const staffRoles = new Set(["admin", "manager", "doorman"]);
+const visitRoles = new Set(["admin", "manager", "doorman", "resident"]);
 
 class ImagesController {
   async upload(request: Request, response: Response) {

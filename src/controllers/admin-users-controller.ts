@@ -2,11 +2,11 @@ import { Request, Response } from "express";
 
 import { prisma } from "@/database/prisma";
 
-class MasterUsersController {
+class AdminUsersController {
   async list(_: Request, response: Response) {
     const users = await prisma.user.findMany({
       where: {
-        role: { not: "master" },
+        role: { not: "admin" },
       },
       select: {
         id: true,
@@ -28,4 +28,4 @@ class MasterUsersController {
   }
 }
 
-export { MasterUsersController };
+export { AdminUsersController };

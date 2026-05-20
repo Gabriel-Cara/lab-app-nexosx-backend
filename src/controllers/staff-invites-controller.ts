@@ -32,7 +32,7 @@ class StaffInvitesController {
     }
 
     const condominiumId =
-      user.role === "master"
+      user.role === "admin"
         ? requestedCondominiumId
         : requireCondominiumId(request);
 
@@ -62,7 +62,7 @@ class StaffInvitesController {
       },
     });
 
-    const inviteUrl = `${env.FRONT_URL}/cadastro-equipe?token=${token}`;
+    const inviteUrl = `${env.FRONT_URL}/cadastro-portaria?token=${token}`;
 
     return response.status(201).json({
       inviteUrl,
@@ -146,7 +146,7 @@ class StaffInvitesController {
           email,
           phone: phone ?? null,
           shift: shift?.trim() || null,
-          role: "staff",
+          role: "doorman",
           condominiumId: invite.condominiumId,
           password: hashedPassword,
         },

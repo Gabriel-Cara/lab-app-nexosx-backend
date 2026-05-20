@@ -20,16 +20,26 @@ authRoutes.post("/forgot-password", authController.forgotPassword);
 authRoutes.post("/reset-password", authController.resetPassword);
 authRoutes.get("/me/:id", authenticate, authController.me);
 
-authRoutes.post("/users", authenticate, authorize(["admin", "staff"]), usersController.create);
-authRoutes.post("/users/:id/resend-invite", authenticate, authorize(["admin", "staff"]), usersController.resendInvite);
-authRoutes.get("/users", authenticate, authorize(["admin", "staff"]), usersController.list);
-authRoutes.put("/users/:id", authenticate, authorize(["admin", "staff"]), usersController.update);
-authRoutes.delete("/users/:id", authenticate, authorize(["admin", "staff"]), usersController.delete);
+authRoutes.post("/users", authenticate, authorize(["admin", "manager", "doorman"]), usersController.create);
+authRoutes.post("/users/:id/resend-invite", authenticate, authorize(["admin", "manager", "doorman"]), usersController.resendInvite);
+authRoutes.get("/users", authenticate, authorize(["admin", "manager", "doorman"]), usersController.list);
+authRoutes.put("/users/:id", authenticate, authorize(["admin", "manager", "doorman"]), usersController.update);
+authRoutes.delete("/users/:id", authenticate, authorize(["admin", "manager", "doorman"]), usersController.delete);
 
+authRoutes.post(
+  "/doorman-invites",
+  authenticate,
+  authorize(["admin", "manager"]),
+  staffInvitesController.create
+);
+authRoutes.get("/doorman-invites/:token", staffInvitesController.show);
+authRoutes.post("/doorman-signup", staffInvitesController.signUp);
+
+// Backward-compatible aliases for invite links already generated before the rename.
 authRoutes.post(
   "/staff-invites",
   authenticate,
-  authorize(["admin", "master"]),
+  authorize(["admin", "manager"]),
   staffInvitesController.create
 );
 authRoutes.get("/staff-invites/:token", staffInvitesController.show);
@@ -38,7 +48,7 @@ authRoutes.post("/staff-signup", staffInvitesController.signUp);
 authRoutes.post(
   "/resident-invites",
   authenticate,
-  authorize(["admin", "staff"]),
+  authorize(["admin", "manager", "doorman"]),
   residentInvitesController.create
 );
 authRoutes.get("/resident-invites/:token", residentInvitesController.show);

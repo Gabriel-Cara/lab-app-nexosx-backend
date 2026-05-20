@@ -57,22 +57,22 @@ class AuthController {
       throw new AppError("Invalid credentials", 401);
     }
 
-    const masterUser = matched.find((user) => user.role === "master");
+    const adminUser = matched.find((user) => user.role === "admin");
 
-    if (masterUser) {
+    if (adminUser) {
       const token = signToken({
-        sub: masterUser.id,
-        role: masterUser.role,
+        sub: adminUser.id,
+        role: adminUser.role,
         condominiumId: null,
       });
 
       return response.json({
         token,
         user: {
-          id: masterUser.id,
-          name: masterUser.name,
-          email: masterUser.email,
-          role: masterUser.role,
+          id: adminUser.id,
+          name: adminUser.name,
+          email: adminUser.email,
+          role: adminUser.role,
           condominiumId: null,
         },
       });
@@ -194,7 +194,7 @@ class AuthController {
       }),
     ]);
 
-    if (record.user?.role === "staff") {
+    if (record.user?.role === "doorman") {
       await sendAccountConfirmationEmail({
         email: record.user.email,
         name: record.user.name,

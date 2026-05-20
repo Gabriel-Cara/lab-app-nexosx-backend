@@ -52,7 +52,7 @@ const swaggerDocument = {
           id: { type: "string", format: "uuid" },
           name: { type: "string" },
           email: { type: "string", format: "email" },
-          role: { type: "string", enum: ["admin", "staff", "resident"] },
+          role: { type: "string", enum: ["manager", "doorman", "resident"] },
         },
       },
       AuthResponse: {
@@ -74,7 +74,7 @@ const swaggerDocument = {
             example: "+5511999999999",
             description: "Telefone em formato E.164 (+55 + DDD + número).",
           },
-          role: { type: "string", enum: ["admin", "staff", "resident"] },
+          role: { type: "string", enum: ["manager", "doorman", "resident"] },
           apartment: { type: "string", nullable: true },
           password: { type: "string", minLength: 6, nullable: true },
           building: { type: "string", nullable: true },
@@ -450,7 +450,7 @@ const swaggerDocument = {
             name: "role",
             schema: {
               type: "string",
-              enum: ["admin", "resident", "staff"],
+              enum: ["manager", "resident", "doorman"],
             },
             description: "Filtra por perfil de usuário",
           },

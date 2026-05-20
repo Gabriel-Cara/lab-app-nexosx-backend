@@ -23,10 +23,10 @@ export async function sendAccountConfirmationEmail({
 
   const condominiumLine = condominiumLabel
     ? `<p style="margin: 0 0 16px;">
-        Seu cadastro como equipe no condomínio <strong>${condominiumLabel}</strong> foi confirmado.
+        Seu cadastro como portaria no condomínio <strong>${condominiumLabel}</strong> foi confirmado.
       </p>`
     : `<p style="margin: 0 0 16px;">
-        Seu cadastro como equipe foi confirmado.
+        Seu cadastro como portaria foi confirmado.
       </p>`;
 
   await resend.emails.send({

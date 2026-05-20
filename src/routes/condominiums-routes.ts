@@ -9,7 +9,7 @@ const condominiumsController = new CondominiumsController();
 
 condominiumsRoutes.use(authenticate);
 
-condominiumsRoutes.get("/", authorize(["master"]), condominiumsController.list);
-condominiumsRoutes.post("/", authorize(["master"]), condominiumsController.create);
+condominiumsRoutes.get("/", authorize(["admin"]), condominiumsController.list);
+condominiumsRoutes.post("/", authorize(["admin"]), condominiumsController.create);
 
 export { condominiumsRoutes };

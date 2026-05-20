@@ -123,7 +123,7 @@ class CondominiumRequestsController {
           email: requestRecord.adminEmail,
           phone: requestRecord.adminPhone ?? null,
           password: requestRecord.adminPasswordHash,
-          role: "admin",
+          role: "manager",
           condominiumId: condominium.id,
         },
         select: {

@@ -34,7 +34,7 @@ class CondominiumsController {
           email: admin.email,
           phone: admin.phone ?? null,
           password: passwordHash,
-          role: "admin",
+          role: "manager",
           condominiumId: condominium.id,
         },
         select: {

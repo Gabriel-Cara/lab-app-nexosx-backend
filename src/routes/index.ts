@@ -9,7 +9,9 @@ import { reservationsRoutes } from "./reservations-routes";
 import { imagesRoutes } from "./images-routes";
 import { condominiumsRoutes } from "./condominiums-routes";
 import { condominiumRequestsRoutes } from "./condominium-requests-routes";
-import { masterRoutes } from "./master-routes";
+import { adminRoutes } from "./admin-routes";
+import { blocksRoutes } from "./blocks-routes";
+import { residencesRoutes } from "./residences-routes";
 
 const routes = Router();
 
@@ -20,8 +22,10 @@ routes.use("/events", eventsRoutes);
 routes.use("/areas", areasRoutes);
 routes.use("/reservations", reservationsRoutes);
 routes.use("/images", imagesRoutes);
+routes.use("/blocks", blocksRoutes);
+routes.use("/residences", residencesRoutes);
 routes.use("/condominiums", condominiumsRoutes);
 routes.use("/condominium-requests", condominiumRequestsRoutes);
-routes.use("/master", masterRoutes);
+routes.use("/admin", adminRoutes);
 
 export { routes };

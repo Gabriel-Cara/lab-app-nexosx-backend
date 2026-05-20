@@ -11,19 +11,19 @@ condominiumRequestsRoutes.post("/", condominiumRequestsController.create);
 condominiumRequestsRoutes.get(
   "/",
   authenticate,
-  authorize(["master"]),
+  authorize(["admin"]),
   condominiumRequestsController.list
 );
 condominiumRequestsRoutes.patch(
   "/:id/approve",
   authenticate,
-  authorize(["master"]),
+  authorize(["admin"]),
   condominiumRequestsController.approve
 );
 condominiumRequestsRoutes.patch(
   "/:id/reject",
   authenticate,
-  authorize(["master"]),
+  authorize(["admin"]),
   condominiumRequestsController.reject
 );
 

@@ -9,16 +9,16 @@ const packagesRoutes = Router();
 const packagesController = new PackagesController();
 
 packagesRoutes.get("/", authenticate, packagesController.list);
-packagesRoutes.post("/", authenticate, authorize(["admin", "staff"]) , packagesController.create);
+packagesRoutes.post("/", authenticate, authorize(["admin", "manager", "doorman"]) , packagesController.create);
 packagesRoutes.post(
   "/:id/resend-code",
   authenticate,
-  authorize(["admin", "staff"]),
+  authorize(["admin", "manager", "doorman"]),
   packagesController.resendCode
 );
-packagesRoutes.patch("/:id", authenticate, authorize(["admin", "staff"]) , packagesController.update);
-packagesRoutes.patch("/:id/retrieve", authenticate, authorize(["admin", "staff"]) , packagesController.retrieve);
-packagesRoutes.patch("/:id/cancel", authenticate, authorize(["admin", "staff"]) , packagesController.cancel);
-packagesRoutes.delete("/:id", authenticate, authorize(["admin", "staff"]) , packagesController.delete);
+packagesRoutes.patch("/:id", authenticate, authorize(["admin", "manager", "doorman"]) , packagesController.update);
+packagesRoutes.patch("/:id/retrieve", authenticate, authorize(["admin", "manager", "doorman"]) , packagesController.retrieve);
+packagesRoutes.patch("/:id/cancel", authenticate, authorize(["admin", "manager", "doorman"]) , packagesController.cancel);
+packagesRoutes.delete("/:id", authenticate, authorize(["admin", "manager", "doorman"]) , packagesController.delete);
 
 export { packagesRoutes };

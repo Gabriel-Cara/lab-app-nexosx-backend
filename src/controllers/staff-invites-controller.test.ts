@@ -98,13 +98,13 @@ describe("StaffInvitesController", () => {
         id: "staff-1",
         name: "Alice",
         email: "alice@example.com",
-        role: "staff",
+        role: "doorman",
       }),
       createTransactionMock({
         id: "staff-2",
         name: "Bob",
         email: "bob@example.com",
-        role: "staff",
+        role: "doorman",
       }),
     ];
 
@@ -142,7 +142,7 @@ describe("StaffInvitesController", () => {
         id: "staff-1",
         name: "Alice",
         email: "alice@example.com",
-        role: "staff",
+        role: "doorman",
       },
       condominium: {
         id: "condo-1",
@@ -155,7 +155,7 @@ describe("StaffInvitesController", () => {
         id: "staff-2",
         name: "Bob",
         email: "bob@example.com",
-        role: "staff",
+        role: "doorman",
       },
       condominium: {
         id: "condo-1",

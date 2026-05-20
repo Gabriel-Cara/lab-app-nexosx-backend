@@ -13,8 +13,8 @@ areasRoutes.get("/", areasController.list);
 areasRoutes.get("/:id", areasController.index);
 areasRoutes.get("/:id/slots", areasController.slots);
 areasRoutes.get("/:id/slots-range", areasController.slotsRange);
-areasRoutes.post("/", authorize(["admin", "staff"]), areasController.create);
-areasRoutes.patch("/:id", authorize(["admin", "staff"]), areasController.update);
-areasRoutes.delete("/:id", authorize(["admin", "staff"]), areasController.delete);
+areasRoutes.post("/", authorize(["admin", "manager", "doorman"]), areasController.create);
+areasRoutes.patch("/:id", authorize(["admin", "manager", "doorman"]), areasController.update);
+areasRoutes.delete("/:id", authorize(["admin", "manager", "doorman"]), areasController.delete);
 
 export { areasRoutes };

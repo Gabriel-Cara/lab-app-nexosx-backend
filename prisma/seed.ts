@@ -47,15 +47,15 @@ const AREAS: AreaSeed[] = [
   },
 ]
 
-const MASTER_EMAIL = process.env.MASTER_EMAIL ?? "master@nexosx.local"
-const MASTER_NAME = process.env.MASTER_NAME ?? "Master"
-const MASTER_PASSWORD = process.env.MASTER_PASSWORD ?? "ChangeMe123!"
+const PLATFORM_ADMIN_EMAIL = process.env.PLATFORM_ADMIN_EMAIL ?? process.env.MASTER_EMAIL ?? "admin@nexosx.com.br"
+const PLATFORM_ADMIN_NAME = process.env.PLATFORM_ADMIN_NAME ?? process.env.MASTER_NAME ?? "Administrador"
+const PLATFORM_ADMIN_PASSWORD = process.env.PLATFORM_ADMIN_PASSWORD ?? process.env.MASTER_PASSWORD ?? "Admin123!"
 
 const DEFAULT_CONDOMINIUM_CODE = process.env.SEED_CONDOMINIUM_CODE ?? "demo"
 const DEFAULT_CONDOMINIUM_NAME = process.env.SEED_CONDOMINIUM_NAME ?? "Condomínio Demo"
-const SEED_ADMIN_NAME = process.env.SEED_ADMIN_NAME ?? "Admin Demo"
-const SEED_ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? "admin@nexosx.local"
-const SEED_ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? "Admin123!"
+const SEED_MANAGER_NAME = process.env.SEED_MANAGER_NAME ?? process.env.SEED_ADMIN_NAME ?? "Gestor Demo"
+const SEED_MANAGER_EMAIL = process.env.SEED_MANAGER_EMAIL ?? process.env.SEED_ADMIN_EMAIL ?? "manager@nexosx.com.br"
+const SEED_MANAGER_PASSWORD = process.env.SEED_MANAGER_PASSWORD ?? process.env.SEED_ADMIN_PASSWORD ?? "Manager123!"
 
 function toMinutes(time: string) {
   const [hours, minutes] = time.split(":").map(Number)
@@ -95,51 +95,51 @@ function buildSlots(area: AreaSeed) {
   return slots
 }
 
-async function ensureMasterUser() {
+async function ensurePlatformAdminUser() {
   const existing = await prisma.user.findFirst({
-    where: { role: "master" },
+    where: { role: "admin" },
   })
 
   if (existing) {
     return existing
   }
 
-  const passwordHash = await hash(MASTER_PASSWORD, 8)
+  const passwordHash = await hash(PLATFORM_ADMIN_PASSWORD, 8)
 
   return prisma.user.create({
     data: {
-      name: MASTER_NAME,
-      email: MASTER_EMAIL,
+      name: PLATFORM_ADMIN_NAME,
+      email: PLATFORM_ADMIN_EMAIL,
       password: passwordHash,
-      role: "master",
+      role: "admin",
     },
   })
 }
 
-async function ensureDemoAdmin(condominiumId: string) {
+async function ensureDemoManager(condominiumId: string) {
   const existing = await prisma.user.findFirst({
-    where: { role: "admin", condominiumId },
+    where: { role: "manager", condominiumId },
   })
 
   if (existing) {
     return existing
   }
 
-  const passwordHash = await hash(SEED_ADMIN_PASSWORD, 8)
+  const passwordHash = await hash(SEED_MANAGER_PASSWORD, 8)
 
   return prisma.user.create({
     data: {
-      name: SEED_ADMIN_NAME,
-      email: SEED_ADMIN_EMAIL,
+      name: SEED_MANAGER_NAME,
+      email: SEED_MANAGER_EMAIL,
       password: passwordHash,
-      role: "admin",
+      role: "manager",
       condominiumId,
     },
   })
 }
 
 async function main() {
-  await ensureMasterUser()
+  await ensurePlatformAdminUser()
 
   const condominium = await prisma.condominium.upsert({
     where: { code: DEFAULT_CONDOMINIUM_CODE },
@@ -150,7 +150,7 @@ async function main() {
     },
   })
 
-  await ensureDemoAdmin(condominium.id)
+  await ensureDemoManager(condominium.id)
 
   await prisma.areaReservation.deleteMany({
     where: { condominiumId: condominium.id },

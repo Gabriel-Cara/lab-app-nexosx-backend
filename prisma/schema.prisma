@@ -8,9 +8,9 @@ datasource db {
 }
 
 enum Role {
-  master
   admin
-  staff
+  manager
+  doorman
   resident
 }
 
@@ -57,6 +57,8 @@ model Condominium {
   updatedAt DateTime @updatedAt @map("updated-at")
 
   users            User[]
+  blocks           Block[]
+  residences       Residence[]
   residentInfos    ResidentInfo[]
   visitors         Visitor[]
   visitLogs        VisitLog[]
@@ -73,6 +75,35 @@ model Condominium {
   residentInvites  ResidentInvite[]
 
   @@map("condominiums")
+}
+
+model Block {
+  id            String      @id @default(uuid())
+  name          String
+  condominiumId String      @map("condominium-id")
+  condominium   Condominium @relation(fields: [condominiumId], references: [id], onDelete: Cascade)
+  residences    Residence[]
+  createdAt     DateTime    @default(now()) @map("created-at")
+  updatedAt     DateTime    @updatedAt @map("updated-at")
+
+  @@unique([condominiumId, name])
+  @@map("blocks")
+}
+
+model Residence {
+  id            String      @id @default(uuid())
+  number        String
+  blockId       String      @map("block-id")
+  block         Block       @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  condominiumId String      @map("condominium-id")
+  condominium   Condominium @relation(fields: [condominiumId], references: [id], onDelete: Cascade)
+  residents     User[]
+  createdAt     DateTime    @default(now()) @map("created-at")
+  updatedAt     DateTime    @updatedAt @map("updated-at")
+
+  @@unique([blockId, number])
+  @@index([condominiumId])
+  @@map("residences")
 }
 
 model CondominiumRequest {
@@ -136,6 +167,8 @@ model User {
   role               Role              @default(resident)
   condominiumId      String?           @map("condominium-id")
   condominium        Condominium?      @relation(fields: [condominiumId], references: [id])
+  residenceId        String?           @map("residence-id")
+  residence          Residence?        @relation(fields: [residenceId], references: [id], onDelete: SetNull)
   apartment          String?
   shift              String?
   createdAt          DateTime          @default(now()) @map("created-at")
@@ -158,6 +191,7 @@ model User {
   residentInvitesCreated ResidentInvite[] @relation("resident-invite-created-by")
 
   @@unique([condominiumId, email])
+  @@index([residenceId])
   @@map("users")
 }
 

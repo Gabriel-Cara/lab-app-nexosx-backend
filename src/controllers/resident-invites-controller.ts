@@ -18,6 +18,7 @@ import {
 import { generateRandomPassword } from "@/utils/generate-random-password";
 import { sendPasswordSetupEmail } from "@/services/mail/send-password-setup-email";
 import { normalizeParkingSpot, normalizeVehiclePlate } from "@/utils/vehicle";
+import { resolveResidenceAssignment } from "@/utils/residence";
 
 const INVITE_TTL_HOURS = 24 * 7;
 
@@ -143,18 +144,25 @@ class ResidentInvitesController {
         throw new AppError("Email already in use", 400);
       }
 
+      const residenceAssignment = await resolveResidenceAssignment(tx, {
+        condominiumId: invite.condominiumId,
+        apartment: normalizedApartment,
+        building,
+      });
+
       const created = await tx.user.create({
         data: {
           name: normalizedName,
           email: normalizedEmail,
           phone: phone ?? null,
           role: "resident",
-          apartment: normalizedApartment,
+          residenceId: residenceAssignment.residenceId,
+          apartment: residenceAssignment.apartment,
           condominiumId: invite.condominiumId,
           password: hashedPassword,
           residents: {
             create: {
-              building: building ?? null,
+              building: residenceAssignment.building,
               vehicles: vehicles?.length
                 ? {
                     create: vehicles.map((vehicle) => ({
